@@ -2416,8 +2416,9 @@
             <div class="custom-course-row">
                 <input type="text" id="newCourseIcon" maxlength="4" class="form-control custom-course-emoji" placeholder="🧬">
                 <input type="text" id="newCourseName" class="form-control" placeholder="Ders adı (örn: AYT Biyoloji)" onkeydown="if(event.key==='Enter')addCustomCategory()">
-                <button onclick="addCustomCategory()">+ Ders Ekle</button>
+                <button type="button" id="addCustomCourseBtn" onclick="if(this.dataset.bound!=='1')addCustomCategory()">+ Ders Ekle</button>
             </div>
+            <div id="newCourseStatus" class="new-group-status" aria-live="polite"></div>
             <div class="custom-course-list" id="customCourseList"></div>
         </div>
     </div>
@@ -2655,33 +2656,6 @@ Temel Kavramlar 01 | 1.Gün 2.Ders | 48 Günde TYT Matematik Kampı 2027,&quot;4
             <label id="srModeSelected" class="sr-mode-btn" for="srModeSelectedInput">🎯 Tek ders</label>
         </div>
         <div id="srModeHint" class="sr-mode-hint">✨ Seçili mod: <strong>Karışık & dengeli</strong></div>
-        <script>
-        (function(){
-            var labels={mixed:'Karışık & dengeli',course:'Ders ders',selected:'Tek ders'};
-            function applyIndependentSRMode(mode){
-                mode=labels[mode]?mode:'mixed';
-                var input=document.getElementById('srMode'+mode.charAt(0).toUpperCase()+mode.slice(1)+'Input');
-                if(input) input.checked=true;
-                var hint=document.getElementById('srModeHint');
-                if(hint) hint.innerHTML='✨ Seçili mod: <strong>'+labels[mode]+'</strong>';
-                var category=document.getElementById('srSessionCategory');
-                if(category) category.disabled=mode!=='selected';
-                try{localStorage.setItem('neurostudy_sr_session_mode',mode);}catch(e){}
-                try{if(typeof window.setSRSessionMode==='function') window.setSRSessionMode(mode,{fromIndependent:true});}catch(e){}
-            }
-            window.getSelectedSRMode=function(){
-                var checked=document.querySelector('input[name="srSessionModeChoice"]:checked');
-                return checked?checked.value:'mixed';
-            };
-            window.applyIndependentSRMode=applyIndependentSRMode;
-            document.querySelectorAll('input[name="srSessionModeChoice"]').forEach(function(input){
-                input.addEventListener('change',function(){ if(this.checked) applyIndependentSRMode(this.value); });
-            });
-            var saved='mixed';
-            try{saved=localStorage.getItem('neurostudy_sr_session_mode')||'mixed';}catch(e){}
-            applyIndependentSRMode(saved);
-        })();
-        </script>
         <div class="sr-session-settings">
             <select id="srSessionCategory" class="form-control" onchange="setSRSessionCategory(this.value)" disabled></select>
             <select id="srSessionLimit" class="form-control" onchange="setSRSessionLimit(this.value)">
@@ -6099,6 +6073,7 @@ async function init() {
     renderCategoryIconSettings();
     renderModalCategoryPicker();
     bindSRModeButtons();
+    bindCustomCourseControls();
     initKonuSourceSelectors();
     setCurrentWeek();
     checkEczaneTime();
@@ -6849,6 +6824,17 @@ function bindSRModeButtons() {
             if (input.checked) setSRSessionMode(input.value);
         });
     });
+    document.querySelectorAll('.sr-mode-btn[for]').forEach(label => {
+        if (label.dataset.bound === '1') return;
+        label.dataset.bound = '1';
+        label.addEventListener('click', event => {
+            event.preventDefault();
+            const input = document.getElementById(label.htmlFor);
+            if (!input) return;
+            input.checked = true;
+            setSRSessionMode(input.value);
+        });
+    });
     let savedMode = 'mixed';
     try { savedMode = localStorage.getItem(SR_MODE_STORAGE_KEY) || readSRSessionModeChoice(); } catch (e) {}
     setSRSessionMode(savedMode, { skipPlannerUpdate: true });
@@ -6856,6 +6842,7 @@ function bindSRModeButtons() {
 
 document.addEventListener('DOMContentLoaded', () => {
     try { bindSRModeButtons(); } catch (error) { console.warn('SR mod seçimleri bağlanamadı:', error); }
+    try { bindCustomCourseControls(); } catch (error) { console.warn('Ders ekleme butonu bağlanamadı:', error); }
 });
 
 function setSRSessionCategory(cat) { srSessionCategory = cat || ''; updateSRSessionPlanner(); }
@@ -6893,10 +6880,11 @@ function updateSRSessionPlanner() {
     const select = document.getElementById('srSessionCategory');
     if (select) {
         const catsWithDue = [...new Set(getDueSRItems().map(x => x.category).filter(Boolean))];
+        const availableCats = [...new Set([...getCategoryKeys(), ...catsWithDue])];
         const prev = srSessionCategory || select.value;
-        select.innerHTML = catsWithDue.map(cat => `<option value="${htmlSafe(cat)}">${htmlSafe(catNames[cat] || cat)}</option>`).join('');
-        if (catsWithDue.includes(prev)) select.value = prev;
-        else if (catsWithDue.length) { select.value = catsWithDue[0]; srSessionCategory = catsWithDue[0]; }
+        select.innerHTML = availableCats.map(cat => `<option value="${htmlSafe(cat)}">${htmlSafe(catNames[cat] || cat)}</option>`).join('');
+        if (availableCats.includes(prev)) select.value = prev;
+        else if (availableCats.length) { select.value = availableCats[0]; srSessionCategory = availableCats[0]; }
         select.disabled = srSessionMode !== 'selected';
     }
     const due = getDueSRItems(srSessionMode === 'selected' ? srSessionCategory : '');
@@ -7741,31 +7729,50 @@ function renderCustomCourseList() {
         </span>`
     ).join('') : '<span class="konu-source-add-hint">Henüz özel ders eklenmedi.</span>';
 }
+function bindCustomCourseControls() {
+    const button = document.getElementById('addCustomCourseBtn');
+    if (!button || button.dataset.bound === '1') return;
+    button.dataset.bound = '1';
+    button.addEventListener('click', addCustomCategory);
+}
 function addCustomCategory() {
     const nameEl = document.getElementById('newCourseName');
     const iconEl = document.getElementById('newCourseIcon');
+    const statusEl = document.getElementById('newCourseStatus');
     const name = (nameEl?.value || '').trim();
     const icon = (iconEl?.value || '').trim() || '📚';
-    if (!name) return alert('Ders adı yazmalısın.');
-    if (Object.values(catNames).some(x => String(x).toLocaleLowerCase('tr-TR') === name.toLocaleLowerCase('tr-TR'))) {
-        return alert('Bu isimde bir ders zaten var.');
+    if (statusEl) { statusEl.textContent = ''; statusEl.className = 'new-group-status'; }
+    if (!name) {
+        if (statusEl) { statusEl.textContent = 'Önce ders adını yazmalısın.'; statusEl.className = 'new-group-status err'; }
+        return;
     }
-    let keyBase = 'custom_' + slugifyCategoryName(name);
-    let key = keyBase;
-    let n = 2;
-    while (catNames[key]) key = keyBase + '_' + n++;
-    appData.customCategories.push({ key, name, icon });
-    catNames[key] = name;
-    catIcons[key] = icon;
-    defaultCatIcons[key] = icon;
-    if (!konuSourcePresets[key]) konuSourcePresets[key] = [{ key:'manuel-' + key, label:'Manuel / Diğer ' + name }];
-    if (nameEl) nameEl.value = '';
-    if (iconEl) iconEl.value = '';
-    saveData();
-    refreshAllCategoryControls();
-    renderCustomCourseList();
-    renderKonuTab();
-    alert(`Ders eklendi: ${name}`);
+    if (Object.values(catNames).some(x => String(x).toLocaleLowerCase('tr-TR') === name.toLocaleLowerCase('tr-TR'))) {
+        if (statusEl) { statusEl.textContent = 'Bu isimde bir ders zaten var.'; statusEl.className = 'new-group-status err'; }
+        return;
+    }
+    try {
+        if (!Array.isArray(appData.customCategories)) appData.customCategories = [];
+        let keyBase = 'custom_' + slugifyCategoryName(name);
+        let key = keyBase;
+        let n = 2;
+        while (catNames[key]) key = keyBase + '_' + n++;
+        appData.customCategories.push({ key, name, icon });
+        catNames[key] = name;
+        catIcons[key] = icon;
+        defaultCatIcons[key] = icon;
+        if (!konuSourcePresets[key]) konuSourcePresets[key] = [{ key:'manuel-' + key, label:'Manuel / Diğer ' + name }];
+        if (nameEl) nameEl.value = '';
+        if (iconEl) iconEl.value = '';
+        saveData();
+        renderCustomCourseList();
+        refreshAllCategoryControls();
+        renderKonuTab();
+        updateSRSessionPlanner();
+        if (statusEl) { statusEl.textContent = `Ders eklendi: ${name}`; statusEl.className = 'new-group-status ok'; }
+    } catch (error) {
+        console.error('Ders eklenemedi:', error);
+        if (statusEl) { statusEl.textContent = `Ders eklenemedi: ${error.message || error}`; statusEl.className = 'new-group-status err'; }
+    }
 }
 function deleteCustomCategory(key) {
     const cat = (appData.customCategories || []).find(x => x.key === key);
@@ -8259,6 +8266,7 @@ function renderKonuTab() {
     const container = document.getElementById('konuContainer');
 
     const byCat = {};
+    getCategoryKeys().forEach(cat => { byCat[cat] = []; });
     appData.konuGroups.forEach(g => {
         if (!byCat[g.cat]) byCat[g.cat] = [];
         byCat[g.cat].push(g);
