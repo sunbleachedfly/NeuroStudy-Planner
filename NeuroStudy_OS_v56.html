@@ -1126,6 +1126,16 @@
             border:1px solid rgba(255,255,255,.085);
             box-shadow:none;
         }
+        .dashboard-week-nav { display:grid; grid-template-columns:auto minmax(190px,1fr) auto; gap:10px; align-items:center; margin:0 0 16px; padding:10px; border:1px solid var(--studio-line); border-radius:16px; background:var(--studio-panel); box-shadow:0 10px 28px rgba(0,0,0,.12); }
+        .dashboard-week-nav-actions { display:flex; gap:7px; }
+        .dashboard-week-nav button { min-height:36px; padding:7px 11px; border-radius:10px; background:rgba(139,124,255,.10); border:1px solid rgba(139,124,255,.24); color:var(--studio-text); }
+        .dashboard-week-nav .dashboard-week-today { background:rgba(88,216,197,.10); border-color:rgba(88,216,197,.25); }
+        .dashboard-week-heading { min-width:0; text-align:center; }
+        .dashboard-week-range { display:block; color:var(--studio-text); font-size:.94rem; font-weight:900; }
+        .dashboard-week-state { display:inline-block; margin-top:2px; color:var(--studio-muted); font-size:.68rem; font-weight:800; }
+        .dashboard-selected-date { display:block; margin-top:3px; color:var(--studio-muted); font-size:.66rem; }
+        .dashboard-date-picker { display:flex; align-items:center; gap:6px; min-height:36px; padding:4px 7px; border-radius:10px; background:rgba(255,255,255,.035); border:1px solid var(--studio-line); color:var(--studio-muted); font-size:.68rem; font-weight:800; white-space:nowrap; }
+        .dashboard-date-picker input { width:132px; min-height:28px; padding:3px 6px; border-radius:7px; background:var(--appearance-input); border:1px solid var(--appearance-border); color:var(--appearance-text); font-size:.7rem; }
 
         .nav-tabs {
             position:fixed;
@@ -1357,6 +1367,13 @@
             .studio-welcome h2 { font-size:2rem; }
             .studio-quick { width:100%; }
             .studio-quick button { flex:1; }
+            .dashboard-week-nav { grid-template-columns:1fr; gap:8px; }
+            .dashboard-week-heading { grid-row:1; }
+            .dashboard-week-nav-actions { display:grid; grid-template-columns:1fr 1fr; }
+            .dashboard-week-nav-actions:last-child { grid-template-columns:1fr; }
+            .dashboard-week-nav button { width:100%; }
+            .dashboard-date-picker { justify-content:space-between; }
+            .dashboard-date-picker input { width:min(170px,55vw); }
 
             .nav-tabs {
                 left:10px;
@@ -2242,6 +2259,25 @@
         html[data-theme="light"] .progress-bg,html[data-theme="light"] .tracker-progress-bg,html[data-theme="light"] .konu-mini-bar,html[data-theme="light"] .tracker-topic-success-bar{background:var(--appearance-progress);border-color:var(--appearance-border)}
         html[data-theme="light"] .chart-tooltip,[data-theme="light"] [title]:hover:after{background:var(--appearance-tooltip);color:#fff}
         html[data-theme="light"] .tab-btn.active{color:#352e78}html[data-theme="light"] .tab-btn:hover{color:#5146a7}
+        html[data-theme="light"] #tab-main .dashboard-week-nav,html[data-theme="light"] #tab-main .dashboard-date-picker{background:var(--appearance-surface);border-color:var(--appearance-border);color:var(--appearance-muted);box-shadow:0 10px 28px rgba(50,60,80,.08)}
+        html[data-theme="light"] #tab-main .task-item{background:var(--appearance-surface-2);border-top-color:var(--appearance-border);border-right-color:var(--appearance-border);border-bottom-color:var(--appearance-border);color:var(--appearance-text);box-shadow:0 5px 14px rgba(50,60,80,.08)}
+        html[data-theme="light"] #tab-main .task-item:hover{background:var(--appearance-surface);box-shadow:0 8px 20px rgba(50,60,80,.13)}
+        html[data-theme="light"] #tab-main .task-title,html[data-theme="light"] #tab-main .task-metrics{color:var(--appearance-text)}
+        html[data-theme="light"] #tab-main .task-checkbox:checked + .task-title{color:var(--appearance-muted)}
+        html[data-theme="light"] #tab-main .task-item:has(.task-checkbox:checked){background:color-mix(in srgb,var(--appearance-surface-2) 82%,var(--appearance-muted) 18%);opacity:.82}
+        html[data-theme="light"] #tab-main .push-btn,html[data-theme="light"] #tab-main .add-task-btn,html[data-theme="light"] #tab-main .del-btn{background:var(--appearance-surface-2);border:1px solid var(--appearance-border);color:var(--appearance-muted);text-decoration:none;opacity:1}
+        html[data-theme="light"] #tab-main .push-btn:hover,html[data-theme="light"] #tab-main .add-task-btn:hover{background:var(--appearance-input);border-color:var(--appearance-muted);color:var(--appearance-text)}
+        html[data-theme="light"] #tab-main .del-btn{padding:3px 7px;border-color:var(--appearance-border);color:var(--kriz);border-radius:6px}
+        html[data-theme="light"] #tab-main .del-btn:hover{background:var(--appearance-input);border-color:var(--kriz);color:var(--kriz)}
+        html[data-theme="light"] body.is-archived #tab-main .task-item{background:var(--appearance-surface-2);border-top-color:var(--appearance-border);border-right-color:var(--appearance-border);border-bottom-color:var(--appearance-border);opacity:.68}
+        html[data-theme="light"] .footer-tools{background:var(--appearance-sidebar);border-color:var(--appearance-border)}
+        html[data-theme="light"] .footer-tools > summary{background:var(--appearance-surface);color:var(--appearance-text)}
+        html[data-theme="light"] .footer-tools > summary:hover,html[data-theme="light"] .footer-tools[open] > summary{background:var(--appearance-surface-2)}
+        html[data-theme="light"] .footer-tools > summary strong{color:var(--appearance-text)}
+        html[data-theme="light"] .footer-tools-hint{color:var(--appearance-muted)}
+        html[data-theme="light"] .footer-tools-body{background:var(--appearance-surface-2);border-top-color:var(--appearance-border)}
+        html[data-theme="light"] .footer-quick-tools button,html[data-theme="light"] .footer-quick-tools a{background:var(--appearance-surface);border-color:var(--appearance-border);color:var(--appearance-text)}
+        html[data-theme="light"] .footer-quick-tools button:hover,html[data-theme="light"] .footer-quick-tools a:hover{background:var(--appearance-input);border-color:var(--appearance-muted)}
         .appearance-shell{max-width:920px;margin:0 auto}.appearance-hero{margin-bottom:14px;padding:20px 22px;border:1px solid var(--studio-line);border-radius:22px;background:var(--studio-panel)}.appearance-hero h2{margin:0 0 5px}.appearance-hero p{margin:0;color:var(--studio-muted)}.appearance-panel{display:grid;grid-template-columns:minmax(260px,.9fr) minmax(300px,1.1fr);gap:14px}.appearance-card{padding:18px;border-radius:18px;background:var(--studio-panel);border:1px solid var(--studio-line)}.appearance-card h3{margin:0 0 14px}.appearance-field{margin-bottom:13px}.appearance-field label{display:block;margin-bottom:5px;color:var(--studio-muted);font-size:.76rem;font-weight:800}.appearance-actions{display:flex;justify-content:flex-end;margin-top:16px}.appearance-preview{padding:18px;border-radius:15px;background:var(--appearance-surface);border:1px solid var(--appearance-border)}.appearance-preview h4{margin:0 0 7px;color:var(--studio-text)}.appearance-preview p{margin:0 0 13px;color:var(--studio-muted)}.appearance-preview-row{display:grid;grid-template-columns:auto minmax(150px,1fr);gap:9px;align-items:center}.appearance-preview .tracker-progress-bg{margin-top:14px}.appearance-note{margin-top:11px;color:var(--studio-muted);font-size:.72rem}.appearance-settings-btn{margin-top:auto}
         @media(max-width:760px){.appearance-panel{grid-template-columns:1fr}}
 </style>
@@ -2302,6 +2338,21 @@
         <button class="studio-secondary" onclick="goToTab('sr')">Yanlış Sorular</button>
     </div>
 </div>
+    <div class="dashboard-week-nav" aria-label="Dashboard hafta navigasyonu">
+        <div class="dashboard-week-nav-actions">
+            <button onclick="shiftDashboardWeek(-1)">← Önceki hafta</button>
+            <button class="dashboard-week-today" onclick="goToCurrentDashboardWeek()">Bugün</button>
+        </div>
+        <div class="dashboard-week-heading" aria-live="polite">
+            <strong class="dashboard-week-range" id="dashboardWeekRange"></strong>
+            <span class="dashboard-week-state" id="dashboardWeekState"></span>
+            <span class="dashboard-selected-date" id="dashboardSelectedDate"></span>
+        </div>
+        <div class="dashboard-week-nav-actions">
+            <label class="dashboard-date-picker"><span>📅 Tarih seç</span><input type="date" id="dashboardDatePicker" onchange="selectDashboardDate(this.value)" aria-label="Dashboard tarihi seç"></label>
+            <button onclick="shiftDashboardWeek(1)">Sonraki hafta →</button>
+        </div>
+    </div>
     <div class="dashboard-grid">
         <div class="card">
             <h3>📊 Görev İlerlemesi</h3>
@@ -2994,6 +3045,7 @@ const SR_CONFIG = {
    ===================================================================== */
 const STORAGE_KEY = 'kostu_planner_v12';
 const LEGACY_STORAGE_KEY = 'kostu_planner_v11';
+const DASHBOARD_WEEK_STORAGE_KEY = 'neurostudy_dashboard_selected_week';
 let storedPlannerData = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
 let appData;
 try {
@@ -6167,12 +6219,77 @@ async function init() {
     setInterval(checkEczaneTime, 60000);
 }
 
+function getWeekKeyForDate(date) {
+    const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const day = utcDate.getUTCDay() || 7;
+    utcDate.setUTCDate(utcDate.getUTCDate() + 4 - day);
+    const year = utcDate.getUTCFullYear();
+    const yearStart = new Date(Date.UTC(year, 0, 1));
+    const week = Math.ceil((((utcDate - yearStart) / 86400000) + 1) / 7);
+    return `${year}-W${String(week).padStart(2, '0')}`;
+}
+function getWeekStartDate(weekStr) {
+    const match = /^(\d{4})-W(\d{2})$/.exec(weekStr || '');
+    if (!match) return null;
+    const year = Number(match[1]), week = Number(match[2]);
+    if (week < 1 || week > 53) return null;
+    const jan4 = new Date(year, 0, 4, 12);
+    const monday = new Date(jan4);
+    monday.setDate(jan4.getDate() - ((jan4.getDay() || 7) - 1) + (week - 1) * 7);
+    monday.setHours(12, 0, 0, 0);
+    return getWeekKeyForDate(monday) === weekStr ? monday : null;
+}
+function parseDashboardDate(dateStr) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr || '');
+    if (!match) return null;
+    const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
+    return date.getFullYear() === Number(match[1]) && date.getMonth() === Number(match[2]) - 1 && date.getDate() === Number(match[3]) ? date : null;
+}
+function getEmptyWeekData() {
+    const days = {};
+    daysOfWeek.forEach(day => days[day] = []);
+    return { archived: false, focusTime: 0, weekly: [], days };
+}
+function getSelectedWeekData() {
+    return appData.weeks[currentWeekStr] || getEmptyWeekData();
+}
 function setCurrentWeek() {
-    const now = new Date();
-    const jan1 = new Date(now.getFullYear(), 0, 1);
-    const weekNum = Math.ceil(((now - jan1) / 86400000 + jan1.getDay() + 1) / 7);
-    document.getElementById('weekSelector').value = `${now.getFullYear()}-W${String(weekNum).padStart(2,'0')}`;
-    changeWeek();
+    const storedWeek = localStorage.getItem(DASHBOARD_WEEK_STORAGE_KEY);
+    const currentKey = getWeekKeyForDate(new Date());
+    const initialWeek = getWeekStartDate(storedWeek) ? storedWeek : currentKey;
+    const initialDate = initialWeek === currentKey ? getTodayStr() : formatLocalDate(getWeekStartDate(initialWeek));
+    changeWeek(initialWeek, initialDate);
+}
+function shiftDashboardWeek(offset) {
+    const picker = document.getElementById('dashboardDatePicker');
+    const date = parseDashboardDate(picker?.value) || getWeekStartDate(currentWeekStr) || new Date();
+    date.setDate(date.getDate() + Number(offset || 0) * 7);
+    changeWeek(getWeekKeyForDate(date), formatLocalDate(date));
+}
+function goToCurrentDashboardWeek() {
+    changeWeek(getWeekKeyForDate(new Date()), getTodayStr());
+}
+function selectDashboardDate(dateStr) {
+    const date = parseDashboardDate(dateStr);
+    if (!date) return;
+    changeWeek(getWeekKeyForDate(date), formatLocalDate(date));
+}
+function renderDashboardWeekNavigation(selectedDateStr) {
+    const start = getWeekStartDate(currentWeekStr);
+    if (!start) return;
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    let selectedDate = parseDashboardDate(selectedDateStr) || parseDashboardDate(document.getElementById('dashboardDatePicker')?.value);
+    if (!selectedDate || selectedDate < start || selectedDate > end) selectedDate = new Date(start);
+    const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+    const startText = start.toLocaleDateString('tr-TR', { day:'numeric', month:sameMonth ? undefined : 'long', year:start.getFullYear() === end.getFullYear() ? undefined : 'numeric' });
+    const endText = end.toLocaleDateString('tr-TR', { day:'numeric', month:'long', year:'numeric' });
+    const currentKey = getWeekKeyForDate(new Date());
+    const state = currentWeekStr === currentKey ? 'Bu hafta' : start < getWeekStartDate(currentKey) ? 'Geçmiş hafta' : 'Gelecek hafta';
+    document.getElementById('dashboardWeekRange').textContent = `${startText}–${endText}`;
+    document.getElementById('dashboardWeekState').textContent = state;
+    document.getElementById('dashboardDatePicker').value = formatLocalDate(selectedDate);
+    document.getElementById('dashboardSelectedDate').textContent = `Seçilen tarih: ${selectedDate.toLocaleDateString('tr-TR', { day:'numeric', month:'long', year:'numeric' })}`;
 }
 
 /* =====================================================================
@@ -6390,14 +6507,21 @@ function saveData() {
     updateProgress(); renderChart();
     scheduleSheetPush();
 }
-function changeWeek() {
-    currentWeekStr = document.getElementById('weekSelector').value;
-    ensureWeekExists(currentWeekStr);
-    if (appData.weeks[currentWeekStr].archived) document.body.classList.add('is-archived');
+function changeWeek(requestedWeek, selectedDateStr) {
+    requestedWeek = requestedWeek || document.getElementById('weekSelector').value;
+    currentWeekStr = getWeekStartDate(requestedWeek) ? requestedWeek : getWeekKeyForDate(new Date());
+    document.getElementById('weekSelector').value = currentWeekStr;
+    safeSetStorage(DASHBOARD_WEEK_STORAGE_KEY, currentWeekStr);
+    const weekData = getSelectedWeekData();
+    if (weekData.archived) document.body.classList.add('is-archived');
     else document.body.classList.remove('is-archived');
-    autoInjectSRTasks();
+    if (currentWeekStr === getWeekKeyForDate(new Date())) {
+        ensureWeekExists(currentWeekStr);
+        autoInjectSRTasks();
+        saveData();
+    }
     renderMonthly(); renderWeekly(); renderDays();
-    saveData();
+    updateProgress(); renderChart(); renderDashboardWeekNavigation(selectedDateStr);
 }
 function generateId() { return Math.random().toString(36).substr(2,9); }
 function formatLocalDate(date) {
@@ -6467,16 +6591,13 @@ function renderMonthly() {
     document.getElementById('list-monthly').innerHTML = appData.monthly.map(t => createTaskHTML(t, 'monthly')).join('');
 }
 function renderWeekly() {
-    document.getElementById('list-weekly').innerHTML = appData.weeks[currentWeekStr].weekly.map(t => createTaskHTML(t, 'weekly')).join('');
+    document.getElementById('list-weekly').innerHTML = getSelectedWeekData().weekly.map(t => createTaskHTML(t, 'weekly')).join('');
 }
 
 function renderDays() {
     const wrapper = document.getElementById('daysWrapper');
-    const weekData = appData.weeks[currentWeekStr];
-    // Compute start date of selected week
-    const [yr, wk] = currentWeekStr.split('-W').map(Number);
-    const jan4 = new Date(yr, 0, 4);
-    const weekStart = new Date(jan4.getTime() - ((jan4.getDay() || 7) - 1) * 86400000 + (wk - 1) * 7 * 86400000);
+    const weekData = getSelectedWeekData();
+    const weekStart = getWeekStartDate(currentWeekStr);
 
     let html = '';
     daysOfWeek.forEach((day, i) => {
@@ -6535,6 +6656,7 @@ function confirmPush(day) {
    TASK CRUD
    ===================================================================== */
 function getList(listId) {
+    if (listId !== 'monthly') ensureWeekExists(currentWeekStr);
     return listId === 'monthly'  ? appData.monthly :
            listId === 'weekly'   ? appData.weeks[currentWeekStr].weekly :
                                    appData.weeks[currentWeekStr].days[listId];
@@ -8583,8 +8705,7 @@ function renderTopicTracker(){
 }
 
 function updateProgress() {
-    const weekData = appData.weeks[currentWeekStr];
-    if (!weekData) return;
+    const weekData = getSelectedWeekData();
 
     const mC = appData.monthly.filter(t=>t.checked).length, mT = appData.monthly.length;
     document.getElementById('fill-monthly').style.width = (mT?(mC/mT)*100:0)+'%';
@@ -8603,11 +8724,11 @@ function updateProgress() {
 }
 function renderChart() {
     const container = document.getElementById('chart-container');
-    const weeks = Object.keys(appData.weeks).sort();
+    const weeks = [...new Set([...Object.keys(appData.weeks), currentWeekStr])].sort();
     let max = 1;
-    weeks.forEach(w => { if (appData.weeks[w].focusTime > max) max = appData.weeks[w].focusTime; });
+    weeks.forEach(w => { if ((appData.weeks[w]?.focusTime || 0) > max) max = appData.weeks[w].focusTime; });
     container.innerHTML = weeks.map(w => {
-        const t = appData.weeks[w].focusTime || 0;
+        const t = appData.weeks[w]?.focusTime || 0;
         const h = (t/max)*100;
         const active = w === currentWeekStr ? 'background:var(--ayt_mat);' : '';
         return `<div class="chart-bar-group"><div class="chart-bar" style="height:${h}%;${active}"><div class="chart-tooltip">${t.toFixed(1)} dk</div></div><div class="chart-label">${w.split('-')[1]}</div></div>`;
