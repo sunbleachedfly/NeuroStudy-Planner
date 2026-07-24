@@ -2374,6 +2374,11 @@
         #tab-konu .konu-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}#tab-konu .konu-card{min-width:0;padding:0}#tab-konu .konu-card-head{padding:11px 13px}#tab-konu .konu-card-body{padding:8px 13px 12px}#tab-konu .konu-section-body{height:auto}@media(max-width:1740px){#tab-konu .konu-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}@media(max-width:1320px){#tab-konu .konu-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:960px){#tab-konu .konu-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:620px){#tab-konu .konu-grid{grid-template-columns:1fr}}
         .task-priority-menu{position:relative;margin-left:auto}.task-priority-menu>summary{display:inline-flex;align-items:center;justify-content:center;min-height:25px;padding:3px 7px;border:1px solid var(--appearance-border);border-radius:999px;background:var(--appearance-surface-2);color:var(--appearance-muted);font-size:.62rem;font-weight:850;cursor:pointer;list-style:none;white-space:nowrap}.task-priority-menu>summary::-webkit-details-marker{display:none}.task-priority-menu>summary.priority-none{width:26px;padding:3px;background:transparent;border-color:transparent}.task-priority-menu-panel{position:absolute;right:0;top:30px;z-index:30;display:grid;gap:4px;min-width:150px;padding:7px;border:1px solid var(--appearance-border);border-radius:10px;background:var(--appearance-modal);box-shadow:0 12px 28px rgba(0,0,0,.2)}.task-priority-menu-panel button{padding:6px 8px;text-align:left;background:var(--appearance-surface-2);border:1px solid transparent;color:var(--appearance-text);font-size:.69rem}.priority-must{color:#C6285A!important;background:rgba(184,50,104,.11)!important;border-color:rgba(184,50,104,.28)!important}.priority-important{color:#B76A00!important;background:rgba(245,158,11,.11)!important;border-color:rgba(245,158,11,.3)!important}.priority-optional{color:#557080!important;background:rgba(96,165,250,.10)!important;border-color:rgba(96,165,250,.24)!important}
         #tab-main .goals-grid{grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch}.today-priority-card{margin:0;padding:17px;border:1px solid color-mix(in srgb,var(--appearance-accent) 34%,var(--appearance-border));border-radius:20px;background:linear-gradient(135deg,color-mix(in srgb,var(--appearance-accent) 8%,var(--appearance-surface)),var(--appearance-surface));box-shadow:0 10px 28px color-mix(in srgb,var(--appearance-text) 7%,transparent)}.today-priority-card-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:9px;padding-bottom:10px;border-bottom:1px solid var(--appearance-border)}.today-priority-card-head h3{margin:0;color:var(--appearance-text);font-size:.9rem}.today-priority-main{display:flex;align-items:center;justify-content:space-between;gap:12px}.today-priority-copy strong{display:block;color:var(--appearance-text);font-size:.96rem}.today-priority-copy span{display:block;margin-top:4px;color:var(--appearance-muted);font-size:.72rem}.today-priority-card button{flex-shrink:0}.today-priority-warning{margin:9px 0 0;padding:7px 9px;border-radius:9px;background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.28);color:#9A5B00;font-size:.7rem}.today-priority-more{margin:7px 0 0;padding-left:18px;color:var(--appearance-muted);font-size:.7rem}.today-priority-empty{display:flex;justify-content:space-between;align-items:center;gap:12px;color:var(--appearance-muted);font-size:.76rem}.today-task-picker-list{display:grid;gap:7px;max-height:55vh;overflow:auto}.today-task-picker-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border:1px solid var(--appearance-border);border-radius:10px;background:var(--appearance-surface-2)}.today-task-picker-item span{min-width:0}.today-task-picker-item strong,.today-task-picker-item small{display:block}.today-task-picker-item small{margin-top:3px;color:var(--appearance-muted)}.task-edit-btn{padding:3px 7px;border:1px solid var(--appearance-border);border-radius:6px;background:var(--appearance-surface-2);color:var(--appearance-muted)}@media(max-width:1100px){#tab-main .goals-grid{grid-template-columns:1fr 1fr}.today-priority-card{grid-column:1/-1}}@media(max-width:700px){#tab-main .goals-grid{grid-template-columns:1fr}.today-priority-card{grid-column:auto}}@media(max-width:620px){.today-priority-main,.today-priority-empty,.today-task-picker-item{align-items:stretch;flex-direction:column}.today-priority-card button,.today-task-picker-item button{width:100%}.task-priority-menu-panel{right:auto;left:0}}
+
+        /* Dedicated weekly board: same week/task data, compact calendar rendering. */
+        #tab-weekly-board{padding:18px 22px 28px} .weekly-board-shell{width:100%;max-width:none;margin:0 auto}.weekly-board-toolbar{display:grid;grid-template-columns:auto minmax(220px,1fr) auto auto;align-items:center;gap:12px;margin-bottom:14px;padding:12px 14px;border:1px solid var(--appearance-border);border-radius:16px;background:var(--appearance-surface);box-shadow:0 8px 24px color-mix(in srgb,var(--appearance-text) 7%,transparent)}.weekly-board-toolbar-actions,.weekly-board-date-controls{display:flex;gap:7px}.weekly-board-date-controls{align-items:center;padding:4px;border:1px solid var(--appearance-border);border-radius:11px;background:var(--appearance-surface-2)}.weekly-board-date-controls input{min-width:132px;min-height:32px;padding:5px 7px;border:0;background:var(--appearance-input);color:var(--appearance-text)}.weekly-board-date-controls button{min-height:32px}.weekly-board-toolbar button{min-height:36px;padding:7px 11px}.weekly-board-heading{text-align:center}.weekly-board-heading strong,.weekly-board-heading span{display:block}.weekly-board-heading strong{color:var(--appearance-text);font-size:1rem}.weekly-board-heading span{margin-top:3px;color:var(--appearance-muted);font-size:.74rem}.weekly-board-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:9px;align-items:stretch}.weekly-board-day{display:flex;min-width:0;min-height:560px;flex-direction:column;padding:10px;border:1px solid var(--appearance-border);border-radius:15px;background:var(--appearance-surface);box-shadow:0 7px 20px color-mix(in srgb,var(--appearance-text) 6%,transparent)}.weekly-board-day.is-today{border-color:var(--appearance-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--appearance-accent) 16%,transparent),0 8px 22px color-mix(in srgb,var(--appearance-text) 7%,transparent)}.weekly-board-day-head{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:9px;padding-bottom:8px;border-bottom:1px solid var(--appearance-border)}.weekly-board-day-head strong{display:block;color:var(--appearance-text);font-size:.8rem}.weekly-board-day-head span{display:block;margin-top:2px;color:var(--appearance-muted);font-size:.66rem}.weekly-board-day-head button{min-width:28px;min-height:28px;padding:2px 7px;border-radius:8px}.weekly-board-task-list{display:flex;flex:1;flex-direction:column;gap:6px}.weekly-board-task{position:relative;display:grid;grid-template-columns:18px minmax(0,1fr);gap:6px;width:100%;padding:8px 7px;border:1px solid var(--appearance-border);border-left:4px solid var(--appearance-muted);border-radius:10px;background:var(--appearance-surface-2);color:var(--appearance-text);text-align:left;cursor:pointer}.weekly-board-task:hover{transform:translateY(-1px);border-color:var(--appearance-accent-2);box-shadow:0 5px 12px color-mix(in srgb,var(--appearance-text) 8%,transparent)}.weekly-board-task.priority-must{border-left-color:#B83268}.weekly-board-task.priority-important{border-left-color:#F59E0B}.weekly-board-task.priority-optional{border-left-color:#60A5FA}.weekly-board-task.is-complete{opacity:.58}.weekly-board-task.is-complete .weekly-board-task-title{text-decoration:line-through}.weekly-board-task-icon{line-height:1.2}.weekly-board-task-copy{min-width:0}.weekly-board-task-title{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;font-size:.72rem;font-weight:800;line-height:1.25;overflow-wrap:anywhere}.weekly-board-task-meta{display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:5px;color:var(--appearance-muted);font-size:.61rem}.weekly-board-priority-dot{width:7px;height:7px;margin-top:3px;border-radius:50%;background:var(--appearance-muted)}.weekly-board-task.priority-must .weekly-board-priority-dot{background:#B83268}.weekly-board-task.priority-important .weekly-board-priority-dot{background:#F59E0B}.weekly-board-task.priority-optional .weekly-board-priority-dot{background:#60A5FA}.weekly-board-empty{margin:auto;color:var(--appearance-muted);font-size:.68rem;text-align:center}.weekly-task-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:13px 0}.weekly-task-detail-field{padding:9px;border:1px solid var(--appearance-border);border-radius:10px;background:var(--appearance-surface-2)}.weekly-task-detail-field span,.weekly-task-detail-field strong{display:block}.weekly-task-detail-field span{color:var(--appearance-muted);font-size:.68rem}.weekly-task-detail-field strong{margin-top:3px;color:var(--appearance-text);font-size:.82rem}.weekly-task-detail-energy{margin:10px 0;padding:9px;border-radius:10px;background:rgba(245,158,11,.10);color:var(--appearance-text);font-size:.74rem}.weekly-task-detail-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px}
+        @media(max-width:1180px){.weekly-board-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.weekly-board-day{min-height:360px}}
+        @media(max-width:640px){#tab-weekly-board{padding:10px 6px 20px}.weekly-board-toolbar{grid-template-columns:1fr;padding:10px}.weekly-board-toolbar-actions{display:grid;grid-template-columns:1fr 1fr}.weekly-board-toolbar-actions:last-child{grid-template-columns:1fr}.weekly-board-date-controls{display:grid;grid-template-columns:minmax(0,1fr) auto}.weekly-board-date-controls input{width:100%;min-width:0}.weekly-board-grid{grid-template-columns:repeat(12,minmax(0,1fr));gap:5px}.weekly-board-day{grid-column:span 4;min-height:230px;padding:6px;border-radius:11px}.weekly-board-day:nth-child(n+4){grid-column:span 3}.weekly-board-day-head{gap:3px;margin-bottom:6px;padding-bottom:5px}.weekly-board-day-head strong{font-size:.68rem}.weekly-board-day-head span{font-size:.56rem}.weekly-board-day-head button{min-width:22px;min-height:24px;padding:1px 5px;font-size:.66rem}.weekly-board-task{grid-template-columns:12px minmax(0,1fr);gap:3px;padding:6px 4px;border-left-width:3px}.weekly-board-task-title{font-size:.61rem}.weekly-board-task-meta{font-size:.52rem;gap:2px 4px}.weekly-board-task-icon{font-size:.7rem}.weekly-board-priority-dot{width:5px;height:5px}.weekly-board-empty{font-size:.56rem}.weekly-task-detail-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -2413,6 +2418,7 @@
 <!-- NAV TABS -->
 <div class="nav-tabs">
     <button class="tab-btn active" onclick="switchTab(&#39;main&#39;, this)">📋 Ana Pano</button>
+    <button class="tab-btn" onclick="switchTab(&#39;weekly-board&#39;, this)">🗓️ Haftalık Plan</button>
     <button class="tab-btn" onclick="switchTab(&#39;konu&#39;, this)">📚 Kaynak Takibi</button>
     <button class="tab-btn" onclick="switchTab(&#39;tracker&#39;, this)">🧭 Konu Takibi</button>
     <button class="tab-btn" onclick="switchTab(&#39;study-log&#39;, this)">📒 Çalışma Günlüğü</button>
@@ -2550,6 +2556,30 @@
             <div class="task-list" id="list-Pazar"></div>
             <button class="add-task-btn" onclick="openModal(&#39;Pazar&#39;)">+ Görev Ekle</button>
         </div></div>
+</div>
+
+<!-- ===== DEDICATED WEEKLY BOARD TAB ===== -->
+<div id="tab-weekly-board" class="tab-content">
+    <div class="weekly-board-shell">
+        <div class="weekly-board-toolbar" aria-label="Haftalık Plan navigasyonu">
+            <div class="weekly-board-toolbar-actions">
+                <button type="button" onclick="shiftWeeklyBoardWeek(-1)">← Önceki hafta</button>
+                <button type="button" onclick="goToCurrentWeeklyBoardWeek()">Bu hafta</button>
+            </div>
+            <div class="weekly-board-heading" aria-live="polite">
+                <strong id="weeklyBoardRange">Haftalık Plan</strong>
+                <span id="weeklyBoardMeta"></span>
+            </div>
+            <div class="weekly-board-date-controls">
+                <input type="date" id="weeklyBoardDatePicker" aria-label="Haftalık Plan tarihi seç" onkeydown="if(event.key==='Enter')goToWeeklyBoardDate()">
+                <button type="button" onclick="goToWeeklyBoardDate()">Haftaya Git</button>
+            </div>
+            <div class="weekly-board-toolbar-actions">
+                <button type="button" onclick="shiftWeeklyBoardWeek(1)">Sonraki hafta →</button>
+            </div>
+        </div>
+        <div class="weekly-board-grid" id="weeklyBoardGrid"></div>
+    </div>
 </div>
 
 <!-- ===== KONU TAKİP TAB ===== -->
@@ -3041,6 +3071,14 @@ Temel Kavramlar 01 | 1.Gün 2.Ders | 48 Günde TYT Matematik Kampı 2027,&quot;4
         <p style="color:var(--appearance-muted);font-size:.78rem;">Bugünün tamamlanmamış görevlerinden birini seç.</p>
         <div class="today-task-picker-list" id="todayTaskPickerList"></div>
         <div class="modal-actions"><button class="danger" onclick="closeTodayTaskPicker()">Kapat</button></div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="weeklyTaskDetailModal" onclick="if(event.target===this)closeWeeklyTaskDetail()">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="weeklyTaskDetailTitle">
+        <h3 id="weeklyTaskDetailTitle">Görev ayrıntısı</h3>
+        <div id="weeklyTaskDetailBody"></div>
+        <div class="weekly-task-detail-actions" id="weeklyTaskDetailActions"></div>
     </div>
 </div>
 
@@ -6694,6 +6732,7 @@ function switchTab(tabId, btn) {
     if (tabId === 'konu') renderKonuTab();
     if (tabId === 'tracker') renderTopicTracker();
     if (tabId === 'study-log') initStudySessionLog();
+    if (tabId === 'weekly-board') renderWeeklyBoard();
     if (tabId === 'settings') syncAppearanceControls();
 }
 function openIconPanel() {
@@ -6806,7 +6845,7 @@ function changeWeek(requestedWeek, selectedDateStr) {
         autoInjectSRTasks();
         saveData();
     }
-    renderMonthly(); renderWeekly(); renderDays(); renderTodayPriority();
+    renderMonthly(); renderWeekly(); renderDays(); renderTodayPriority(); renderWeeklyBoard();
     updateProgress(); renderChart(); renderDashboardWeekNavigation(selectedDateStr);
 }
 function generateId() { return Math.random().toString(36).substr(2,9); }
@@ -6920,6 +6959,102 @@ function renderDays() {
         </div>`;
     });
     wrapper.innerHTML = html;
+}
+
+function weeklyBoardTaskHTML(task, day) {
+    const priority = getTaskPriority(task);
+    const lessonIcon = catIconMarkup(task.category) || '📝';
+    const status = task.checked ? 'Tamamlandı' : 'Planlandı';
+    return `<button type="button" class="weekly-board-task priority-${priority}${task.checked?' is-complete':''}" onclick="openWeeklyTaskDetail('${day}','${task.id}')" title="${htmlSafe(task.title || 'Görev')}" aria-label="${htmlSafe(task.title || 'Görev')} ayrıntısını aç">
+        <span class="weekly-board-task-icon">${lessonIcon}</span>
+        <span class="weekly-board-task-copy">
+            <span class="weekly-board-task-title">${htmlSafe(task.title || 'İsimsiz görev')}</span>
+            <span class="weekly-board-task-meta"><span>${Number(task.est)||0} dk</span><span>${status}</span><i class="weekly-board-priority-dot" title="${htmlSafe(TASK_PRIORITY_LABELS[priority])}"></i></span>
+        </span>
+    </button>`;
+}
+
+function goToWeeklyBoardDate() {
+    const picker = document.getElementById('weeklyBoardDatePicker');
+    const date = parseDashboardDate(picker?.value);
+    if (!date) return;
+    changeWeek(getWeekKeyForDate(date), formatLocalDate(date));
+}
+
+function shiftWeeklyBoardWeek(offset) {
+    const picker = document.getElementById('weeklyBoardDatePicker');
+    const currentStart = getWeekStartDate(currentWeekStr);
+    let date = parseDashboardDate(picker?.value);
+    if (!date || !currentStart || getWeekKeyForDate(date) !== currentWeekStr) date = currentStart || new Date();
+    date = new Date(date);
+    date.setDate(date.getDate() + Number(offset || 0) * 7);
+    if (picker) picker.value = formatLocalDate(date);
+    changeWeek(getWeekKeyForDate(date), formatLocalDate(date));
+}
+
+function goToCurrentWeeklyBoardWeek() {
+    const today = new Date();
+    const picker = document.getElementById('weeklyBoardDatePicker');
+    if (picker) picker.value = formatLocalDate(today);
+    changeWeek(getWeekKeyForDate(today), formatLocalDate(today));
+}
+
+function renderWeeklyBoard() {
+    const grid = document.getElementById('weeklyBoardGrid');
+    const range = document.getElementById('weeklyBoardRange');
+    const meta = document.getElementById('weeklyBoardMeta');
+    if (!grid || !range || !meta || !currentWeekStr) return;
+    const start = getWeekStartDate(currentWeekStr);
+    if (!start) return;
+    const end = new Date(start); end.setDate(start.getDate() + 6);
+    const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+    const startText = start.toLocaleDateString('tr-TR',{day:'numeric',month:sameMonth?undefined:'long',year:start.getFullYear()===end.getFullYear()?undefined:'numeric'});
+    const endText = end.toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'});
+    range.textContent = `${startText}–${endText}`;
+    const currentKey = getWeekKeyForDate(new Date());
+    const weekState = currentWeekStr === currentKey ? 'Bu hafta' : start < getWeekStartDate(currentKey) ? 'Geçmiş hafta' : 'Gelecek hafta';
+    meta.textContent = `${currentWeekStr.replace('-W',' · Hafta ')} · ${weekState}`;
+    const picker = document.getElementById('weeklyBoardDatePicker');
+    let selectedDate = parseDashboardDate(picker?.value);
+    if (!selectedDate || getWeekKeyForDate(selectedDate) !== currentWeekStr) selectedDate = currentWeekStr === currentKey ? new Date() : new Date(start);
+    if (picker) picker.value = formatLocalDate(selectedDate);
+    const weekData = getSelectedWeekData();
+    grid.innerHTML = daysOfWeek.map((day,index)=>{
+        const date = new Date(start); date.setDate(start.getDate()+index);
+        const isToday = formatLocalDate(date) === getTodayStr();
+        const tasks = sortTasksForDisplay(weekData.days?.[day] || []);
+        return `<section class="weekly-board-day${isToday?' is-today':''}">
+            <div class="weekly-board-day-head"><div><strong>${day}</strong><span>${date.toLocaleDateString('tr-TR',{day:'numeric',month:'short'})}</span></div><button type="button" onclick="openModal('${day}')" title="${day} gününe görev ekle" aria-label="${day} gününe görev ekle">+</button></div>
+            <div class="weekly-board-task-list">${tasks.length?tasks.map(task=>weeklyBoardTaskHTML(task,day)).join(''):'<div class="weekly-board-empty">Görev yok</div>'}</div>
+        </section>`;
+    }).join('');
+}
+
+function closeWeeklyTaskDetail() {
+    const modal = document.getElementById('weeklyTaskDetailModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function openWeeklyTaskDetail(day, taskId) {
+    const task = (getSelectedWeekData().days?.[day] || []).find(item=>item.id===taskId);
+    const modal = document.getElementById('weeklyTaskDetailModal');
+    const title = document.getElementById('weeklyTaskDetailTitle');
+    const body = document.getElementById('weeklyTaskDetailBody');
+    const actions = document.getElementById('weeklyTaskDetailActions');
+    if (!task || !modal || !title || !body || !actions) return;
+    const priority = getTaskPriority(task);
+    const energyLabels = {high:'Yüksek',mid:'Orta',low:'Düşük'};
+    title.textContent = task.title || 'Görev ayrıntısı';
+    body.innerHTML = `<div class="weekly-task-detail-grid">
+        <div class="weekly-task-detail-field"><span>Ders</span><strong>${catIconMarkup(task.category)} ${htmlSafe(catNames[task.category]||task.category||'Ders')}</strong></div>
+        <div class="weekly-task-detail-field"><span>Gün</span><strong>${day}</strong></div>
+        <div class="weekly-task-detail-field"><span>Hedef süre</span><strong>${Number(task.est)||0} dk</strong></div>
+        <label class="weekly-task-detail-field"><span>Gerçekleşen süre</span><input type="number" min="0" class="form-control" value="${Number(task.act)||''}" placeholder="Dakika" onchange="updateActual('${day}','${task.id}',this.value)"></label>
+        <div class="weekly-task-detail-field"><span>Öncelik</span><strong class="priority-${priority}">${htmlSafe(TASK_PRIORITY_LABELS[priority])}</strong></div>
+        <div class="weekly-task-detail-field"><span>Durum</span><strong>${task.checked?'Tamamlandı':'Tamamlanmadı'}</strong></div>
+    </div><div class="weekly-task-detail-energy">Enerji ihtiyacı: <strong>${energyLabels[task.energy]||'Belirtilmedi'}</strong>${task.energy==='high'?' · Yüksek enerji gerektiren görev':''}</div>`;
+    actions.innerHTML = `<button type="button" onclick="closeWeeklyTaskDetail()">Kapat</button><button type="button" onclick="closeWeeklyTaskDetail();openTaskEdit('${day}','${task.id}')">Düzenle</button><button type="button" class="danger" onclick="closeWeeklyTaskDetail();deleteTask('${day}','${task.id}')">Sil</button><button type="button" onclick="closeWeeklyTaskDetail();toggleTask('${day}','${task.id}',${task.checked?'false':'true'})">${task.checked?'Tamamlamayı kaldır':'Tamamla'}</button>`;
+    modal.style.display = 'flex';
 }
 
 /* =====================================================================
