@@ -285,7 +285,7 @@
         .sr-library-card.due { border-color:rgba(227,179,65,.5); }
         .sr-library-actions { display:flex; gap:7px; flex-wrap:wrap; margin-top:11px; }
         .sr-library-actions button { padding:6px 10px; font-size:.78rem; }
-        .sr-library-schedule { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:7px; margin-top:9px; padding-top:9px; border-top:1px dashed rgba(255,255,255,.08); }
+        .sr-library-schedule { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:7px; margin-top:9px; padding-top:9px; border-top:1px dashed rgba(255,255,255,.08); }
         .sr-library-schedule input { min-width:0; }
         .sr-library-schedule button { padding:7px 10px; font-size:.75rem; white-space:nowrap; }
         @media (max-width:520px) { .sr-library-schedule { grid-template-columns:1fr; } }
@@ -1875,7 +1875,7 @@
         }
         .sr-snooze-row {
             display:grid;
-            grid-template-columns:repeat(3,minmax(0,1fr));
+            grid-template-columns:repeat(auto-fit,minmax(135px,1fr));
             gap:8px;
             margin-top:9px;
         }
@@ -2362,6 +2362,7 @@
         html[data-theme-preference="blush-ivory"] #tab-sr{--sr-lilac:#7C5CBF;--sr-lilac-border:#B9A4DF;--sr-lilac-soft:#F1EBFA;--sr-lilac-input:#FCFAFF}
         html[data-theme-preference="blush-ivory"] #tab-sr .sr-hero,html[data-theme-preference="blush-ivory"] #tab-sr .sr-add-box,html[data-theme-preference="blush-ivory"] #tab-sr .sr-session-planner,html[data-theme-preference="blush-ivory"] #tab-sr .sr-due-card,html[data-theme-preference="blush-ivory"] #tab-sr .sr-library-card{border-color:var(--sr-lilac-border)!important;box-shadow:0 6px 18px rgba(124,92,191,.07)!important}
         html[data-theme-preference="blush-ivory"] #tab-sr .sr-add-box,html[data-theme-preference="blush-ivory"] #tab-sr .sr-session-planner,html[data-theme-preference="blush-ivory"] #tab-sr .sr-session-summary{background:var(--sr-lilac-soft)!important}
+        html[data-theme-preference="blush-ivory"] #tab-sr .sr-session-progress-copy,html[data-theme-preference="blush-ivory"] #tab-sr .sr-session-card .sr-due-title{color:#000!important}
         html[data-theme-preference="blush-ivory"] #tab-sr .section-header,html[data-theme-preference="blush-ivory"] #tab-sr .sr-section-title,html[data-theme-preference="blush-ivory"] #tab-sr .sr-library-schedule{border-color:var(--sr-lilac-border)!important}
         html[data-theme-preference="blush-ivory"] #tab-sr input,html[data-theme-preference="blush-ivory"] #tab-sr select,html[data-theme-preference="blush-ivory"] #tab-sr textarea,html[data-theme-preference="blush-ivory"] #tab-sr .form-control{background:var(--sr-lilac-input)!important;border-color:var(--sr-lilac-border)!important;color:var(--appearance-text)!important}
         html[data-theme-preference="blush-ivory"] #tab-sr .sr-image-box,html[data-theme-preference="blush-ivory"] #tab-sr .sr-image-pick{background:color-mix(in srgb,var(--sr-lilac-soft) 58%,#fff)!important;border-color:var(--sr-lilac-border)!important}
@@ -2793,10 +2794,10 @@ Temel Kavramlar 01 | 1.Gün 2.Ders | 48 Günde TYT Matematik Kampı 2027,&quot;4
                 <p>Soru görselini ekle; görsel Drive'a, soru bilgileri ve tekrar tarihi Sheet senkronuna kaydedilir. Tekrar zamanı geldiğinde soru burada otomatik görünür.</p>
             </div>
             <div class="sr-stat-grid">
-                <div class="sr-stat"><strong id="srStatDue">0</strong><span>Bugün</span></div>
-                <div class="sr-stat"><strong id="srStatTotal">0</strong><span>Toplam</span></div>
-                <div class="sr-stat"><strong id="srStatReviews">0</strong><span>Tekrar</span></div>
-                <div class="sr-stat"><strong id="srStatLearning">0</strong><span>Öğreniliyor</span></div>
+                <div class="sr-stat"><strong id="srStatOverdue">0</strong><span>Geciken</span></div>
+                <div class="sr-stat"><strong id="srStatToday">0</strong><span>Bugün</span></div>
+                <div class="sr-stat"><strong id="srStatNew">0</strong><span>Yeni</span></div>
+                <div class="sr-stat"><strong id="srStatReady">0</strong><span>Oturumda hazır</span></div>
             </div>
         </div>
     </div>
@@ -2903,6 +2904,7 @@ Temel Kavramlar 01 | 1.Gün 2.Ders | 48 Günde TYT Matematik Kampı 2027,&quot;4
             <button type="button" onclick="startConfiguredSRSession()">Seansı Başlat / Yenile</button>
         </div>
         <div class="sr-session-summary" id="srSessionSummary"></div>
+        <div id="srSessionResumePrompt"></div>
     </div>
     <div class="sr-due-grid" id="srDueGrid"></div>
 
@@ -3208,6 +3210,12 @@ const SR_CONFIG = {
     maxInterval: 365, graduatingInterval: 1, easyInterval: 4,
     lapseMinInterval: 1, leechThreshold: 6, fuzzPct: 0
 };
+const srIntervals = [1, 3, 7, 14, 30, 60];
+
+let srImageDraft = {
+    question: { dataUrl: '', name: '' },
+    solution: { dataUrl: '', name: '' }
+};
 
 const STUDY_SESSION_ACTIVITIES = ['lecture','test','error-analysis','spaced-repetition','mock-exam','review','other'];
 const STUDY_SESSION_DIFFICULTIES = ['','easy','medium','hard'];
@@ -3235,6 +3243,9 @@ function normalizeAppData(data){
 const STORAGE_KEY = 'kostu_planner_v12';
 const LEGACY_STORAGE_KEY = 'kostu_planner_v11';
 const DASHBOARD_WEEK_STORAGE_KEY = 'neurostudy_dashboard_selected_week';
+const SHEET_CFG_URL_KEY = 'kostu_sheet_url';
+const SHEET_CFG_SECRET_KEY = 'kostu_sheet_secret';
+const SHEET_LAST_SYNC_KEY = 'kostu_sheet_last_sync_at';
 let storedPlannerData = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
 let appData;
 try {
@@ -6027,14 +6038,9 @@ function ensureSeededKonuGroups() {
 }
 
 const daysOfWeek = ["Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi","Pazar"];
-const srIntervals = [1, 3, 7, 14, 30, 60];
 const energyMap   = { 'high':'🔴', 'mid':'🟡', 'low':'🟢' };
 
 let currentWeekStr = "", targetListIdForModal = "", editingTaskId = null;
-let srImageDraft = {
-    question: { dataUrl: '', name: '' },
-    solution: { dataUrl: '', name: '' }
-};
 let timerInterval = null, timerTotalSeconds = 50*60, timerRemaining = 50*60;
 let pushTargetTaskId = null;
 let rescueVisible = false;
@@ -6046,6 +6052,15 @@ let srSessionCategory = '';
 let srSessionLimit = 15;
 let srSessionFinished = false;
 let srSessionInitialCount = 0;
+let srSessionCompletedIds = [];
+let srSessionAgainCounts = {};
+let srSessionRequeued = 0;
+let srSessionResumePending = false;
+let srSessionRestoredRuntime = null;
+let srSessionRuntimeChecked = false;
+let srSessionStartedAt = '';
+let srSessionNotice = '';
+const srSessionReviewInFlight = new Set();
 
 /* =====================================================================
    YANLIŞ SORU GÖRSEL SEÇİMİ / YAPIŞTIRMA
@@ -6109,9 +6124,6 @@ function bindSRPasteArea(kind, elementId) {
         }
     });
 }
-
-bindSRPasteArea('question', 'srQuestionPick');
-bindSRPasteArea('solution', 'srSolutionPick');
 
 /* =====================================================================
    EXPORT / IMPORT (localStorage → JSON)
@@ -6181,9 +6193,6 @@ function importData() {
    aynı Web App URL + gizli anahtarı kullanır. Kurulum talimatları
    için Claude sohbetine bak.
    ===================================================================== */
-const SHEET_CFG_URL_KEY = 'kostu_sheet_url';
-const SHEET_CFG_SECRET_KEY = 'kostu_sheet_secret';
-const SHEET_LAST_SYNC_KEY = 'kostu_sheet_last_sync_at';
 let sheetSyncTimer = null;
 let sheetSyncInFlight = false;
 
@@ -6398,7 +6407,9 @@ async function init() {
     applyCustomCatIcons();
     refreshCategorySelect('modalCategory', true);
     refreshCategorySelect('srInputCategory');
-    refreshCategorySelect('srFilterCategory');
+    refreshCategorySelect('srFilterCategory', false, true);
+    bindSRPasteArea('question', 'srQuestionPick');
+    bindSRPasteArea('solution', 'srSolutionPick');
     renderCategoryIconSettings();
     renderModalCategoryPicker();
     bindSRModeButtons();
@@ -6677,7 +6688,7 @@ function switchTab(tabId, btn) {
         if (tabButton) tabButton.classList.add('active');
     }
     if (tabId === 'sr') {
-        srSessionStarted = false;
+        prepareSRSessionRuntime();
         renderSRTab();
     }
     if (tabId === 'konu') renderKonuTab();
@@ -7039,19 +7050,22 @@ function saveTask() {
    ===================================================================== */
 function normalizeSRItem(item) {
     if (!item || typeof item !== 'object') return item;
-    if (typeof item.ease !== 'number') item.ease = SR_CONFIG.startingEase;
-    if (typeof item.interval !== 'number') {
-        item.interval = (typeof item.intervalIdx === 'number' && srIntervals[item.intervalIdx]) ? srIntervals[item.intervalIdx] : 0;
-    }
-    if (typeof item.reps !== 'number') item.reps = item.reviewCount || 0;
-    if (typeof item.lapses !== 'number') item.lapses = item.lapseCount || 0;
-    if (!item.state) item.state = ((item.reviewCount || 0) > 0 || item.interval > 0) ? 'review' : 'new';
-    if (typeof item.isLeech !== 'boolean') item.isLeech = item.lapses >= SR_CONFIG.leechThreshold;
-    if (typeof item.intervalIdx !== 'number') item.intervalIdx = 0;
+    const maxEase = Math.min(3.2, Number(SR_CONFIG.maxEase) || 3.2);
+    const minEase = Number(SR_CONFIG.minEase) || 1.3;
+    item.ease = Math.max(minEase, Math.min(maxEase, Number.isFinite(Number(item.ease)) ? Number(item.ease) : SR_CONFIG.startingEase));
+    const reviewCount = Math.max(0, Number(item.reviewCount) || 0, Number(item.reps) || 0);
+    const lapseCount = Math.max(0, Number(item.lapseCount) || 0, Number(item.lapses) || 0);
+    item.reviewCount = item.reps = reviewCount;
+    item.lapseCount = item.lapses = lapseCount;
+    const legacyInterval = Number.isFinite(Number(item.intervalIdx)) && srIntervals[Math.max(0, Math.min(Number(item.intervalIdx), srIntervals.length - 1))] || 0;
+    item.interval = Math.max(0, Math.min(3650, Number.isFinite(Number(item.interval)) ? Number(item.interval) : legacyInterval));
+    if (typeof item.intervalIdx !== 'number') item.intervalIdx = getLegacySRIntervalIndex(item.interval);
+    else item.intervalIdx = Math.max(0, Math.min(Math.floor(item.intervalIdx), srIntervals.length - 1));
+    const validStates = ['new','learning','review','relearning'];
+    if (!validStates.includes(item.state)) item.state = reviewCount > 0 || item.interval > 0 ? 'review' : 'new';
+    item.isLeech = lapseCount >= (Number(SR_CONFIG.leechThreshold) || 6);
     if (!item.createdAt) item.createdAt = getTodayStr();
     if (!item.nextReview) item.nextReview = item.createdAt;
-    if (typeof item.reviewCount !== 'number') item.reviewCount = 0;
-    if (typeof item.lapseCount !== 'number') item.lapseCount = item.lapses || 0;
     if (!item.status) item.status = 'active';
     if (!item.errorType) item.errorType = '';
     if (!item.topic) item.topic = '';
@@ -7059,7 +7073,104 @@ function normalizeSRItem(item) {
     if (!item.questionNo) item.questionNo = '';
     if (!item.note) item.note = '';
     if (!Array.isArray(item.reviewHistory)) item.reviewHistory = [];
+    if (!item.manualOverride || typeof item.manualOverride !== 'object') item.manualOverride = null;
     return item;
+}
+
+function getLegacySRIntervalIndex(interval) {
+    const days = Math.max(0, Number(interval) || 0);
+    let best = 0;
+    srIntervals.forEach((value, index) => { if (Math.abs(value - days) < Math.abs(srIntervals[best] - days)) best = index; });
+    return best;
+}
+
+function getSRSnapshot(item) {
+    return {state:item.state,interval:Number(item.interval)||0,intervalIdx:Number(item.intervalIdx)||0,ease:Number(item.ease)||SR_CONFIG.startingEase,reps:Number(item.reps)||0,lapses:Number(item.lapses)||0,reviewCount:Number(item.reviewCount)||0,lapseCount:Number(item.lapseCount)||0,isLeech:!!item.isLeech,due:item.nextReview||''};
+}
+
+function getSRReviewDate(value) {
+    const source = value instanceof Date ? new Date(value) : (value ? new Date(value) : new Date());
+    if (Number.isNaN(source.getTime())) return new Date();
+    source.setHours(12,0,0,0);
+    return source;
+}
+
+function addSRDays(date, days) {
+    const result = getSRReviewDate(date);
+    result.setDate(result.getDate() + Math.max(0, Math.round(Number(days) || 0)));
+    return formatLocalDate(result);
+}
+
+function srDaysBetween(from, to) {
+    const start = getSRReviewDate(from), end = getSRReviewDate(String(to || '') + 'T12:00:00');
+    return Math.max(0, Math.round((end - start) / 86400000));
+}
+
+function createSRHistoryEvent(type, data = {}) {
+    return {id:'srh_'+Date.now().toString(36)+'_'+generateId(),type,at:data.at||new Date().toISOString(),rating:data.rating||'',action:data.action||data.rating||type,previous:data.previous||null,next:data.next||null,nextReview:data.next?.due||data.nextReview||'',manualOverride:data.manualOverride||null,detail:data.detail||''};
+}
+
+function pushSRHistoryEvent(item, event) {
+    if (!Array.isArray(item.reviewHistory)) item.reviewHistory = [];
+    item.reviewHistory.unshift(event);
+    item.reviewHistory = item.reviewHistory.slice(0, 100);
+}
+
+function scheduleSRReview(item, rating, options = {}) {
+    normalizeSRItem(item);
+    if (!['again','hard','good','easy'].includes(rating)) throw new Error('Geçersiz SR değerlendirmesi.');
+    const reviewedAt = getSRReviewDate(options.reviewedAt), reviewedAtISO = reviewedAt.toISOString();
+    const previous = getSRSnapshot(item), previousState = previous.state;
+    const minEase = Number(SR_CONFIG.minEase) || 1.3, maxEase = Math.min(3.2, Number(SR_CONFIG.maxEase) || 3.2);
+    const easeDelta = rating === 'again' ? -0.20 : rating === 'hard' ? -0.15 : rating === 'easy' ? 0.15 : 0;
+    const ease = Math.max(minEase, Math.min(maxEase, Number((previous.ease + easeDelta).toFixed(2))));
+    let state = previousState, interval = Math.max(1, previous.interval || 1), lapseIncrement = 0;
+    if (previousState === 'new' || previousState === 'learning') {
+        if (rating === 'again') { state = 'learning'; interval = 1; lapseIncrement = 1; }
+        else if (rating === 'hard') { state = 'learning'; interval = 2; }
+        else if (rating === 'good') { state = 'review'; interval = 3; }
+        else { state = 'review'; interval = 7; }
+    } else if (previousState === 'relearning') {
+        if (rating === 'again') { state = 'relearning'; interval = 1; lapseIncrement = 1; }
+        else if (rating === 'hard') { state = 'relearning'; interval = 2; }
+        else if (rating === 'good') { state = 'review'; interval = Math.max(3, Math.ceil(Math.max(1, previous.interval) * 0.5)); }
+        else { state = 'review'; interval = Math.max(7, Math.ceil(Math.max(1, previous.interval) * 0.75)); }
+    } else {
+        if (rating === 'again') { state = 'relearning'; interval = Math.max(1, Number(SR_CONFIG.lapseMinInterval) || 1); lapseIncrement = 1; }
+        else if (rating === 'hard') { state = 'review'; interval = Math.ceil(Math.max(1, previous.interval) * (Number(SR_CONFIG.hardMultiplier) || 1.2)); }
+        else if (rating === 'good') { state = 'review'; interval = Math.ceil(Math.max(1, previous.interval) * previous.ease * (Number(SR_CONFIG.intervalModifier) || 1)); }
+        else { state = 'review'; interval = Math.ceil(Math.max(1, previous.interval) * previous.ease * (Number(SR_CONFIG.easyBonus) || 1.3) * (Number(SR_CONFIG.intervalModifier) || 1)); }
+    }
+    const maxInterval = Number(SR_CONFIG.maxInterval) || 365;
+    interval = Math.max(1, Math.min(maxInterval, interval));
+    let due = addSRDays(reviewedAt, interval), manualOverride = null;
+    if (Number.isFinite(Number(options.manualIntervalDays)) && Number(options.manualIntervalDays) >= 1) {
+        if(Number(options.manualIntervalDays)>3650)throw new Error('Manuel tekrar süresi 3650 günü aşamaz.');
+        interval = Math.floor(Number(options.manualIntervalDays));
+        due = addSRDays(reviewedAt, Number(options.manualIntervalDays));
+        manualOverride = {type:'days',value:Number(options.manualIntervalDays),appliedAt:reviewedAtISO,resultingDue:due};
+    } else if (/^\d{4}-\d{2}-\d{2}$/.test(String(options.manualReviewDate||''))) {
+        due = String(options.manualReviewDate);
+        if(due<formatLocalDate(reviewedAt))throw new Error('Manuel tekrar tarihi geçmişte olamaz.');
+        interval = Math.min(3650, srDaysBetween(reviewedAt, due));
+        manualOverride = {type:'date',value:due,appliedAt:reviewedAtISO,resultingDue:due};
+    }
+    const reps = previous.reps + 1, lapses = previous.lapses + lapseIncrement;
+    const next = {state,interval,intervalIdx:getLegacySRIntervalIndex(interval),ease,reps,lapses,reviewCount:reps,lapseCount:lapses,isLeech:lapses >= (Number(SR_CONFIG.leechThreshold) || 6),nextReview:due,lastReviewedAt:reviewedAtISO,lastRating:rating,manualOverride};
+    const nextSnapshot = {...next,due};
+    const historyEvent = createSRHistoryEvent('review',{at:reviewedAtISO,rating,previous,next:nextSnapshot,manualOverride,detail:`${interval} gün`});
+    const leechEvent = !previous.isLeech && next.isLeech ? createSRHistoryEvent('leech',{at:reviewedAtISO,previous,next:nextSnapshot,detail:'Leech eşiğine ulaştı'}) : null;
+    return {previous,next,due,historyEvent,leechEvent};
+}
+
+function commitSRSchedule(item, result) {
+    const next = result.next;
+    Object.assign(item,{state:next.state,interval:next.interval,intervalIdx:next.intervalIdx,ease:next.ease,reps:next.reps,reviewCount:next.reviewCount,lapses:next.lapses,lapseCount:next.lapseCount,isLeech:next.isLeech,nextReview:next.nextReview,lastReviewedAt:next.lastReviewedAt,lastRating:next.lastRating,manualOverride:next.manualOverride});
+    delete item.customIntervalDays;
+    delete item.customReviewDate;
+    pushSRHistoryEvent(item,result.historyEvent);
+    if(result.leechEvent)pushSRHistoryEvent(item,result.leechEvent);
+    return result;
 }
 
 function setSRUploadStatus(message, type) {
@@ -7186,51 +7297,24 @@ function addDaysFromToday(days) {
 }
 
 function calculateSRReview(item, rating) {
-    normalizeSRItem(item);
-    const currentIdx = Math.max(0, Math.min(Number(item.intervalIdx || 0), srIntervals.length - 1));
-    let nextIdx = currentIdx;
-    let days = 1;
-    if (rating === 'again') {
-        nextIdx = 0;
-        days = 1;
-    } else if (rating === 'hard') {
-        nextIdx = currentIdx;
-        days = Math.max(2, Math.ceil(srIntervals[currentIdx] * 0.75));
-    } else if (rating === 'easy') {
-        nextIdx = Math.min(currentIdx + 2, srIntervals.length - 1);
-        days = srIntervals[nextIdx];
-    } else {
-        nextIdx = Math.min(currentIdx + 1, srIntervals.length - 1);
-        days = srIntervals[nextIdx];
-        rating = 'good';
-    }
-    return { rating, nextIdx, days };
+    const result = scheduleSRReview(item, rating);
+    return {rating,nextIdx:result.next.intervalIdx,days:result.next.interval,result};
+}
+
+function setSRManualUndoStatus(itemId,message) {
+    const el=document.getElementById('srUploadStatus');if(!el)return;
+    el.className='sr-upload-status ok';
+    el.innerHTML=`${htmlSafe(message)} <button type="button" class="sync-export" style="margin-left:8px;padding:4px 8px" onclick="clearSRManualOverride('${itemId}')">Otomatiğe dön</button>`;
 }
 
 function addSRHistory(item, action, nextReview, detail) {
     normalizeSRItem(item);
-    item.reviewHistory.unshift({
-        at: new Date().toISOString(),
-        action,
-        nextReview: nextReview || item.nextReview || '',
-        detail: detail || ''
-    });
-    item.reviewHistory = item.reviewHistory.slice(0, 100);
+    pushSRHistoryEvent(item,{at:new Date().toISOString(),action,nextReview:nextReview||item.nextReview||'',detail:detail||''});
 }
 
-function applySRReview(item, rating) {
-    normalizeSRItem(item);
-    const result = calculateSRReview(item, rating);
-    if (result.rating === 'again') item.lapseCount += 1;
-    item.intervalIdx = result.nextIdx;
-    item.nextReview = addDaysFromToday(result.days);
-    item.lastReviewedAt = new Date().toISOString();
-    item.lastRating = result.rating;
-    item.reviewCount += 1;
-    delete item.customIntervalDays;
-    delete item.customReviewDate;
-    addSRHistory(item, result.rating, item.nextReview, `${result.days} gün`);
-    return result.days;
+function applySRReview(item, rating, options = {}) {
+    const result = commitSRSchedule(item,scheduleSRReview(item,rating,options));
+    return options.returnResult ? result : result.next.interval;
 }
 
 function formatSRAction(action, detail) {
@@ -7243,7 +7327,11 @@ function formatSRAction(action, detail) {
         custom_days:'Manuel gün',
         custom_date:'Manuel tarih',
         tomorrow:'Yarına erteledi',
-        later_today:'Bugün sona attı'
+        later_today:'Bugün sona attı',
+        threeDays:'3 gün erteledi',
+        customDate:'Özel tarihe erteledi',
+        automatic:'Otomatik plana döndü',
+        leech:'Leech eşiğine ulaştı'
     };
     return (map[action] || action) + (detail ? ` · ${detail}` : '');
 }
@@ -7303,6 +7391,7 @@ function getCourseGroupedSRIds(items) {
 
 function buildSRSessionIds(limit = srSessionLimit) {
     srSessionMode = readSRSessionModeChoice();
+    if(srSessionMode==='selected'&&!getCategoryKeys().includes(srSessionCategory))return [];
     const filter = srSessionMode === 'selected' ? srSessionCategory : '';
     const items = getDueSRItems(filter);
     let ids = srSessionMode === 'mixed' ? getBalancedSRIds(items) : getCourseGroupedSRIds(items);
@@ -7314,12 +7403,103 @@ function buildSRSessionIds(limit = srSessionLimit) {
 function resetSRSession(limit = srSessionLimit) {
     srSessionQueue = buildSRSessionIds(limit);
     srSessionCompleted = 0;
+    srSessionCompletedIds = [];
+    srSessionAgainCounts = {};
+    srSessionRequeued = 0;
     srSessionInitialCount = srSessionQueue.length;
     srSessionStarted = true;
     srSessionFinished = false;
+    srSessionResumePending = false;
+    srSessionRestoredRuntime = null;
+    srSessionStartedAt = new Date().toISOString();
+    srSessionNotice = '';
+    persistSRSessionRuntime();
 }
 
 const SR_MODE_STORAGE_KEY = 'neurostudy_sr_session_mode';
+const SR_CATEGORY_STORAGE_KEY = 'neurostudy_sr_session_category';
+const SR_RUNTIME_STORAGE_KEY = 'neurostudy_sr_session_runtime';
+
+function clearSRSessionRuntime() {
+    try { localStorage.removeItem(SR_RUNTIME_STORAGE_KEY); } catch (e) {}
+    srSessionRestoredRuntime = null;
+    srSessionResumePending = false;
+}
+
+function getSRSessionItemKey(id) { return String(id ?? ''); }
+function sameSRSessionItemId(a,b) { return getSRSessionItemKey(a) === getSRSessionItemKey(b); }
+function normalizeSRSessionQueueIds(ids) {
+    const seen=new Set();
+    return (Array.isArray(ids)?ids:[]).filter(id=>{const key=getSRSessionItemKey(id);if(!key||seen.has(key))return false;seen.add(key);return true;});
+}
+function normalizeSRSessionAgainCounts(counts) {
+    const normalized={};
+    if(counts&&typeof counts==='object')Object.entries(counts).forEach(([id,count])=>{const key=getSRSessionItemKey(id),value=Math.max(0,Math.floor(Number(count)||0));if(key&&value)normalized[key]=value;});
+    return normalized;
+}
+function getSRSessionAgainCount(id) { return Number(srSessionAgainCounts[getSRSessionItemKey(id)])||0; }
+function setSRSessionAgainCount(id,count) { srSessionAgainCounts[getSRSessionItemKey(id)]=Math.max(0,Math.floor(Number(count)||0)); }
+function getActiveSRRequeueCount() {
+    const queued=new Set(srSessionQueue.map(getSRSessionItemKey));
+    return Object.entries(srSessionAgainCounts).filter(([id,count])=>Number(count)>0&&Number(count)<3&&queued.has(getSRSessionItemKey(id))).length;
+}
+function syncSRSessionRequeuedCount() { srSessionRequeued=getActiveSRRequeueCount();return srSessionRequeued; }
+
+function persistSRSessionRuntime() {
+    if (!srSessionStarted || srSessionFinished || !srSessionQueue.length) return clearSRSessionRuntime();
+    srSessionQueue=normalizeSRSessionQueueIds(srSessionQueue);
+    srSessionCompletedIds=normalizeSRSessionQueueIds(srSessionCompletedIds);
+    srSessionAgainCounts=normalizeSRSessionAgainCounts(srSessionAgainCounts);
+    srSessionQueue=srSessionQueue.filter(id=>getSRSessionAgainCount(id)<3);
+    if(!srSessionQueue.length)return clearSRSessionRuntime();
+    syncSRSessionRequeuedCount();
+    const payload={version:1,startedAt:srSessionStartedAt||new Date().toISOString(),mode:srSessionMode,selectedCourse:srSessionCategory||'',queueItemIds:[...srSessionQueue],completedItemIds:[...srSessionCompletedIds],againCounts:{...srSessionAgainCounts},currentItemId:srSessionQueue[0]||'',requeuedCount:srSessionRequeued};
+    try { localStorage.setItem(SR_RUNTIME_STORAGE_KEY,JSON.stringify(payload)); } catch (e) { console.warn('SR oturum durumu kaydedilemedi:',e); }
+}
+
+function readSRSessionRuntime() {
+    try {
+        const parsed=JSON.parse(localStorage.getItem(SR_RUNTIME_STORAGE_KEY)||'null');
+        if(!parsed||!Array.isArray(parsed.queueItemIds)||!parsed.queueItemIds.length)return null;
+        if(parsed.mode==='selected'&&!getCategoryKeys().includes(parsed.selectedCourse)){localStorage.removeItem(SR_RUNTIME_STORAGE_KEY);return null;}
+        const active=new Set(appData.srPool.filter(item=>item&&item.status!=='archived').map(item=>getSRSessionItemKey(item.id)));
+        const againCounts=normalizeSRSessionAgainCounts(parsed.againCounts);
+        const queue=normalizeSRSessionQueueIds(parsed.queueItemIds.filter(id=>active.has(getSRSessionItemKey(id))&&(Number(againCounts[getSRSessionItemKey(id)])||0)<3));
+        if(!queue.length)return null;
+        return{...parsed,queueItemIds:queue,completedItemIds:normalizeSRSessionQueueIds(parsed.completedItemIds),againCounts};
+    } catch(e){return null;}
+}
+
+function prepareSRSessionRuntime() {
+    if(srSessionRuntimeChecked)return;
+    srSessionRuntimeChecked=true;
+    const runtime=readSRSessionRuntime();
+    if(runtime){srSessionRestoredRuntime=runtime;srSessionResumePending=true;}
+}
+
+function continueStoredSRSession() {
+    const runtime=srSessionRestoredRuntime||readSRSessionRuntime();
+    if(!runtime)return startConfiguredSRSession();
+    srSessionMode=['mixed','course','selected'].includes(runtime.mode)?runtime.mode:'mixed';
+    srSessionCategory=runtime.selectedCourse||'';
+    srSessionQueue=normalizeSRSessionQueueIds(runtime.queueItemIds);
+    srSessionCompletedIds=normalizeSRSessionQueueIds(runtime.completedItemIds);
+    srSessionCompleted=srSessionCompletedIds.length;
+    srSessionAgainCounts=normalizeSRSessionAgainCounts(runtime.againCounts);
+    syncSRSessionRequeuedCount();
+    srSessionInitialCount=Math.max(srSessionQueue.length+srSessionCompleted,srSessionQueue.length);
+    srSessionStartedAt=runtime.startedAt||new Date().toISOString();
+    srSessionStarted=true;srSessionFinished=false;srSessionResumePending=false;srSessionRestoredRuntime=null;
+    setSRSessionMode(srSessionMode,{skipPlannerUpdate:true});
+    if(srSessionCategory)try{localStorage.setItem(SR_CATEGORY_STORAGE_KEY,srSessionCategory)}catch(e){}
+    persistSRSessionRuntime();renderSRDue();
+}
+
+function discardStoredSRSession() {
+    clearSRSessionRuntime();
+    srSessionStarted=false;srSessionRuntimeChecked=true;
+    startConfiguredSRSession();
+}
 
 function readSRSessionModeChoice() {
     const checked = document.querySelector('input[name="srSessionModeChoice"]:checked');
@@ -7364,6 +7544,7 @@ function bindSRModeButtons() {
     });
     let savedMode = 'mixed';
     try { savedMode = localStorage.getItem(SR_MODE_STORAGE_KEY) || readSRSessionModeChoice(); } catch (e) {}
+    try { srSessionCategory = localStorage.getItem(SR_CATEGORY_STORAGE_KEY) || ''; } catch (e) {}
     setSRSessionMode(savedMode, { skipPlannerUpdate: true });
 }
 
@@ -7372,33 +7553,35 @@ document.addEventListener('DOMContentLoaded', () => {
     try { bindCustomCourseControls(); } catch (error) { console.warn('Ders ekleme butonu bağlanamadı:', error); }
 });
 
-function setSRSessionCategory(cat) { srSessionCategory = cat || ''; updateSRSessionPlanner(); }
+function setSRSessionCategory(cat) { srSessionCategory = getCategoryKeys().includes(cat)?cat:'';try{if(srSessionCategory)localStorage.setItem(SR_CATEGORY_STORAGE_KEY,srSessionCategory);else localStorage.removeItem(SR_CATEGORY_STORAGE_KEY)}catch(e){}updateSRSessionPlanner(); }
 function setSRSessionLimit(value) { srSessionLimit = Math.max(1, Number(value) || 15); updateSRSessionPlanner(); }
 
 function startConfiguredSRSession() {
     srSessionMode = readSRSessionModeChoice();
-    if (srSessionMode === 'selected' && !srSessionCategory) {
-        const select = document.getElementById('srSessionCategory');
-        if (select && select.options.length) { select.selectedIndex = 0; srSessionCategory = select.value; }
-    }
+    if (srSessionMode === 'selected' && !getCategoryKeys().includes(srSessionCategory)) return setSRUploadStatus('Tek ders modu için önce bir ders seçmelisin.','err');
+    clearSRSessionRuntime();
     resetSRSession(srSessionLimit);
     renderSRDue();
 }
 
 function addMoreToSRSession(count) {
-    const existing = new Set(srSessionQueue);
+    const existing = new Set(srSessionQueue.map(getSRSessionItemKey));
     const filter = srSessionMode === 'selected' ? srSessionCategory : '';
-    let items = getDueSRItems(filter).filter(item => !existing.has(item.id));
+    let items = getDueSRItems(filter).filter(item => !existing.has(getSRSessionItemKey(item.id)));
     let ids = srSessionMode === 'mixed' ? getBalancedSRIds(items) : getCourseGroupedSRIds(items);
     if (count < 9999) ids = ids.slice(0, count);
     srSessionQueue.push(...ids);
     srSessionInitialCount += ids.length;
     srSessionFinished = false;
+    srSessionStarted=true;
+    if(!srSessionStartedAt)srSessionStartedAt=new Date().toISOString();
+    persistSRSessionRuntime();
     renderSRDue();
 }
 
 function finishSRSessionForToday() {
     srSessionFinished = true;
+    clearSRSessionRuntime();
     renderSRDue();
 }
 
@@ -7409,9 +7592,9 @@ function updateSRSessionPlanner() {
         const catsWithDue = [...new Set(getDueSRItems().map(x => x.category).filter(Boolean))];
         const availableCats = [...new Set([...getCategoryKeys(), ...catsWithDue])];
         const prev = srSessionCategory || select.value;
-        select.innerHTML = availableCats.map(cat => `<option value="${htmlSafe(cat)}">${htmlSafe(catNames[cat] || cat)}</option>`).join('');
+        select.innerHTML = `<option value="">Ders seç</option>`+availableCats.map(cat => `<option value="${htmlSafe(cat)}">${htmlSafe(catNames[cat] || cat)}</option>`).join('');
         if (availableCats.includes(prev)) select.value = prev;
-        else if (availableCats.length) { select.value = availableCats[0]; srSessionCategory = availableCats[0]; }
+        else { select.value = ''; srSessionCategory = ''; }
         select.disabled = srSessionMode !== 'selected';
     }
     const due = getDueSRItems(srSessionMode === 'selected' ? srSessionCategory : '');
@@ -7426,23 +7609,60 @@ function updateSRSessionPlanner() {
 }
 
 function removeFromSRSession(id) {
-    srSessionQueue = srSessionQueue.filter(x => x !== id);
-    srSessionCompleted += 1;
+    const wasQueued=srSessionQueue.some(x=>sameSRSessionItemId(x,id));
+    srSessionQueue = srSessionQueue.filter(x => !sameSRSessionItemId(x,id));
+    if(wasQueued&&!srSessionCompletedIds.some(x=>sameSRSessionItemId(x,id)))srSessionCompletedIds.push(id);
+    srSessionCompleted = srSessionCompletedIds.length;
+    syncSRSessionRequeuedCount();
+    persistSRSessionRuntime();
+}
+
+function requeueSRToEnd(id,nextCount) {
+    if(nextCount>=3)return{requeued:false,limitReached:true,count:nextCount};
+    setSRSessionAgainCount(id,nextCount);
+    srSessionQueue=srSessionQueue.filter(itemId=>!sameSRSessionItemId(itemId,id));
+    const insertAt=Math.min(3,srSessionQueue.length);
+    srSessionQueue.splice(insertAt,0,id);
+    syncSRSessionRequeuedCount();
+    persistSRSessionRuntime();
+    return{requeued:true,limitReached:false,count:nextCount,waitCards:insertAt};
+}
+
+function limitSRItemForSession(id,nextCount=3) {
+    setSRSessionAgainCount(id,Math.max(3,nextCount));
+    srSessionQueue=srSessionQueue.filter(itemId=>!sameSRSessionItemId(itemId,id));
+    srSessionCompletedIds=srSessionCompletedIds.filter(itemId=>!sameSRSessionItemId(itemId,id));
+    srSessionCompleted=srSessionCompletedIds.length;
+    syncSRSessionRequeuedCount();
+    persistSRSessionRuntime();
+    return{requeued:false,limitReached:true,count:getSRSessionAgainCount(id)};
 }
 
 async function reviewSRItem(id, rating) {
-    const item = appData.srPool.find(x => x.id === id);
-    if (!item) return;
-    const days = applySRReview(item, rating);
-    cleanupPendingSRTasks(id);
-    if (rating === 'again') requeueSRToEnd(id);
-    else removeFromSRSession(id);
-    saveData();
-    await renderSRTab();
-    const msg = rating === 'again'
-        ? '🔁 Bu soruyu bu seansın sonunda tekrar göreceksin; yarın için de planlandı.'
-        : `✅ Tekrar kaydedildi. Bu soru ${days} gün sonra yeniden gelecek.`;
-    setSRUploadStatus(msg, 'ok');
+    const itemKey=getSRSessionItemKey(id);
+    if(srSessionReviewInFlight.has(itemKey))return;
+    srSessionReviewInFlight.add(itemKey);
+    const itemIndex=appData.srPool.findIndex(x => sameSRSessionItemId(x.id,id)),item=appData.srPool[itemIndex];
+    if (!item){srSessionReviewInFlight.delete(itemKey);return;}
+    const before=JSON.parse(JSON.stringify(item));
+    let persisted=false;
+    try{
+        const currentAgainCount=rating==='again'?getSRSessionAgainCount(id):0;
+        if(rating==='again'&&currentAgainCount>=3){limitSRItemForSession(id,currentAgainCount);srSessionNotice='Bu soru bugün birkaç kez tekrarlandı. Yarın yeniden gösterilecek.';await renderSRTab();return setSRUploadStatus(srSessionNotice,'ok');}
+        const nextAgainCount=rating==='again'?currentAgainCount+1:0;
+        const result=applySRReview(item,rating,{returnResult:true});
+        if(!saveData()){appData.srPool[itemIndex]=before;return setSRUploadStatus('Tekrar kalıcı olarak kaydedilemedi; kayıt değiştirilmedi.','err');}
+        persisted=true;
+        cleanupPendingSRTasks(id);
+        saveData();
+        let queueResult=null;
+        if(rating==='again')queueResult=nextAgainCount>=3?limitSRItemForSession(id,nextAgainCount):requeueSRToEnd(id,nextAgainCount);else removeFromSRSession(id);
+        srSessionNotice=queueResult?.limitReached?'Bu soru bugün birkaç kez tekrarlandı. Yarın yeniden gösterilecek.':'';
+        await renderSRTab();
+        if(queueResult?.limitReached)return setSRUploadStatus(srSessionNotice,'ok');
+        const msg=rating==='again'?`🔁 Soru ${queueResult.waitCards||0} kart sonra yeniden gösterilecek; yarın için de planlandı.`:`✅ Tekrar kaydedildi. Bu soru ${result.next.interval} gün sonra yeniden gelecek.`;
+        setSRUploadStatus(msg,'ok');
+    }catch(error){if(!persisted)appData.srPool[itemIndex]=before;console.error('SR değerlendirmesi kaydedilemedi:',error);setSRUploadStatus(persisted?'Değerlendirme kaydedildi ancak ekran yenilenemedi. Sayfayı yenileyebilirsin.':'Değerlendirme kaydedilemedi; soru verisi değiştirilmedi.','err');}finally{srSessionReviewInFlight.delete(itemKey);}
 }
 
 async function scheduleSRCustomDays(id, inputId) {
@@ -7453,20 +7673,12 @@ async function scheduleSRCustomDays(id, inputId) {
     if (!Number.isFinite(days) || days < 1 || days > 3650) {
         return setSRUploadStatus('Özel tekrar süresi 1–3650 gün arasında olmalı.', 'err');
     }
-    normalizeSRItem(item);
-    item.interval = Math.min(days, SR_CONFIG.maxInterval);
-    item.state = 'review';
-    item.nextReview = addDaysFromToday(days);
-    item.lastReviewedAt = new Date().toISOString();
-    item.lastRating = 'custom_days';
-    item.customIntervalDays = days;
-    item.reviewCount += 1;
-    addSRHistory(item, 'custom_days', item.nextReview, `${days} gün sonra · otomatik aşama korundu`);
+    applyManualSRSchedule(item,'days',days);
     cleanupPendingSRTasks(id);
     removeFromSRSession(id);
     saveData();
     await renderSRTab();
-    setSRUploadStatus(`✅ Manuel tekrar kaydedildi. Otomatik aşama korunarak ${days} gün sonrasına ayarlandı.`, 'ok');
+    setSRManualUndoStatus(id,`✅ Manuel tekrar kaydedildi. ${days} gün sonrasına ayarlandı.`);
 }
 
 function openSRDatePicker(inputId) {
@@ -7493,41 +7705,63 @@ async function scheduleSRCustomDate(id, inputId) {
     if (dateValue < today) {
         return setSRUploadStatus('Tekrar tarihi geçmişte olamaz.', 'err');
     }
-    normalizeSRItem(item);
-    item.nextReview = dateValue;
-    item.state = 'review';
-    item.lastReviewedAt = new Date().toISOString();
-    item.lastRating = 'custom_date';
-    item.customReviewDate = dateValue;
-    item.reviewCount += 1;
+    applyManualSRSchedule(item,'date',dateValue);
     const formatted = new Date(dateValue + 'T12:00:00').toLocaleDateString('tr-TR');
-    addSRHistory(item, 'custom_date', item.nextReview, `${formatted} · otomatik aşama korundu`);
     cleanupPendingSRTasks(id);
     removeFromSRSession(id);
     saveData();
     await renderSRTab();
-    setSRUploadStatus(`✅ Manuel tarih kaydedildi: ${formatted}. Otomatik aşama korunuyor.`, 'ok');
+    setSRManualUndoStatus(id,`✅ Manuel tarih kaydedildi: ${formatted}.`);
+}
+
+function applyManualSRSchedule(item,type,value) {
+    normalizeSRItem(item);
+    const appliedAt=new Date().toISOString(),previous=getSRSnapshot(item),today=getSRReviewDate();
+    const due=type==='days'?addSRDays(today,Number(value)):String(value),interval=type==='days'?Number(value):srDaysBetween(today,due);
+    const manualOverride={type,value,appliedAt,resultingDue:due,automaticDue:item.manualOverride?.automaticDue||previous.due,automaticInterval:Number.isFinite(Number(item.manualOverride?.automaticInterval))?Number(item.manualOverride.automaticInterval):previous.interval};
+    item.interval=interval;item.intervalIdx=getLegacySRIntervalIndex(interval);item.nextReview=due;item.manualOverride=manualOverride;
+    const next=getSRSnapshot(item);
+    pushSRHistoryEvent(item,createSRHistoryEvent('manual_schedule',{at:appliedAt,action:type==='days'?'custom_days':'custom_date',previous,next,manualOverride,detail:type==='days'?`${value} gün`:`${due}`}));
+    return manualOverride;
+}
+
+async function clearSRManualOverride(id) {
+    const item=appData.srPool.find(x=>x.id===id);if(!item)return;
+    normalizeSRItem(item);const override=item.manualOverride;if(!override)return setSRUploadStatus('Bu soru için aktif manuel plan bulunmuyor.','err');
+    const previous=getSRSnapshot(item);item.interval=Math.max(0,Number(override.automaticInterval)||0);item.intervalIdx=getLegacySRIntervalIndex(item.interval);item.nextReview=override.automaticDue||getTodayStr();item.manualOverride=null;
+    pushSRHistoryEvent(item,createSRHistoryEvent('manual_schedule',{action:'automatic',previous,next:getSRSnapshot(item),detail:'Otomatik plana dönüldü'}));
+    saveData();await renderSRTab();setSRUploadStatus('✅ Manuel seçim temizlendi; otomatik plana dönüldü.','ok');
+}
+
+function snoozeSRItem(item,option,value) {
+    normalizeSRItem(item);const previous=getSRSnapshot(item),at=new Date().toISOString();let due=item.nextReview||getTodayStr(),label='';
+    if(option==='tomorrow'){due=addDaysFromToday(1);label='Yarına ertelendi';}
+    else if(option==='threeDays'){due=addDaysFromToday(3);label='3 gün ertelendi';}
+    else if(option==='customDate'){if(!/^\d{4}-\d{2}-\d{2}$/.test(String(value||''))||value<getTodayStr())throw new Error('Geçerli ve geçmişte olmayan bir tarih seçmelisin.');due=value;label='Özel tarihe ertelendi';}
+    else if(option==='laterToday'){label='Seansın sonuna taşındı';}
+    else throw new Error('Geçersiz erteleme seçeneği.');
+    item.nextReview=due;item.lastSnoozedAt=at;item.snoozeMetadata={option,value:value||null,at,resultingDue:due};
+    pushSRHistoryEvent(item,createSRHistoryEvent('snooze',{at,action:option==='tomorrow'?'tomorrow':option==='laterToday'?'later_today':option,previous,next:getSRSnapshot(item),detail:label}));
+    return{due,label};
+}
+
+async function postponeSRItem(id,option,inputId='') {
+    const item=appData.srPool.find(x=>x.id===id);if(!item)return;
+    const value=option==='customDate'?String(document.getElementById(inputId)?.value||''):'';
+    try{const result=snoozeSRItem(item,option,value);cleanupPendingSRTasks(id);removeFromSRSession(id);saveData();await renderSRTab();setSRUploadStatus(`↪️ ${result.label}; scheduler durumu değişmedi.`,'ok');}catch(error){setSRUploadStatus(error.message,'err');}
 }
 
 async function postponeSRTomorrow(id) {
-    const item = appData.srPool.find(x => x.id === id);
-    if (!item) return;
-    item.nextReview = addDaysFromToday(1);
-    item.lastRating = 'tomorrow';
-    addSRHistory(item, 'tomorrow', item.nextReview, 'Değerlendirme yapılmadı');
-    cleanupPendingSRTasks(id);
-    removeFromSRSession(id);
-    saveData();
-    await renderSRTab();
-    setSRUploadStatus('↪️ Soru yarına ertelendi; otomatik aşama değişmedi.', 'ok');
+    return postponeSRItem(id,'tomorrow');
 }
 
 async function moveSRToSessionEnd(id) {
-    if (!srSessionQueue.includes(id)) return;
-    srSessionQueue = srSessionQueue.filter(x => x !== id);
+    if (!srSessionQueue.some(x=>sameSRSessionItemId(x,id))) return;
+    srSessionQueue = srSessionQueue.filter(x => !sameSRSessionItemId(x,id));
     srSessionQueue.push(id);
     const item = appData.srPool.find(x => x.id === id);
-    if (item) addSRHistory(item, 'later_today', item.nextReview, 'Seansın sonuna taşındı');
+    if (item) snoozeSRItem(item,'laterToday');
+    saveData();persistSRSessionRuntime();
     renderSRDue();
 }
 
@@ -7594,7 +7828,10 @@ async function addSRItem() {
         const id = generateId();
         const newSRItem = normalizeSRItem({
             id, title, category, topic, source, questionNo, errorType, note,
+            state: 'new',
+            interval: 0,
             intervalIdx: 0,
+            ease: SR_CONFIG.startingEase,
             nextReview: addDaysFromToday(srIntervals[0]),
             createdAt: getTodayStr(),
             questionImageFileId: uploadedQuestionId,
@@ -7603,8 +7840,9 @@ async function addSRItem() {
             solutionImgId: localSolutionId,
             questionImageName: srImageDraft.question.name,
             storageMode: driveSucceeded ? 'drive' : 'local',
-            reviewCount: 0,
-            lapseCount: 0,
+            reps: 0, reviewCount: 0,
+            lapses: 0, lapseCount: 0,
+            isLeech: false,
             status: 'active'
         });
         addSRHistory(newSRItem, 'created', newSRItem.nextReview, 'İlk tekrar 1 gün sonra');
@@ -7741,7 +7979,10 @@ function renderSRHistory(item) {
         <div class="sr-history-list">
             ${history.map(h => {
                 const d = h.at ? new Date(h.at).toLocaleString('tr-TR', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) : '';
-                return `<div class="sr-history-item"><span>${htmlSafe(formatSRAction(h.action, h.detail))}</span><span>${htmlSafe(d)}</span></div>`;
+                const action=h.action||h.rating||h.type||'event',structured=h.previous&&h.next;
+                const transition=structured?`${Number(h.previous.interval||0)} → ${Number(h.next.interval||0)} gün · ease ${Number(h.previous.ease||0).toFixed(2)} → ${Number(h.next.ease||0).toFixed(2)} · sonraki ${h.next.due||h.nextReview||'-'}`:'';
+                const tag=h.type==='snooze'?'Erteleme':h.type==='manual_schedule'?'Manuel':h.type==='leech'?'Leech':'';
+                return `<div class="sr-history-item"><span>${tag?`<strong>${tag}</strong> · `:''}${htmlSafe(formatSRAction(action,h.detail))}${transition?`<small style="display:block;margin-top:3px;color:var(--text-muted)">${htmlSafe(transition)}</small>`:''}</span><span>${htmlSafe(d)}</span></div>`;
             }).join('')}
         </div>
     </details>`;
@@ -7749,33 +7990,44 @@ function renderSRHistory(item) {
 
 function srEaseMeterHTML(item) {
     normalizeSRItem(item);
-    const pct = Math.round(((Math.max(SR_CONFIG.minEase, Math.min(SR_CONFIG.maxEase, item.ease)) - SR_CONFIG.minEase) / (SR_CONFIG.maxEase - SR_CONFIG.minEase)) * 100);
+    const displayMax=Math.min(3.2,Number(SR_CONFIG.maxEase)||3.2),pct = Math.round(((Math.max(SR_CONFIG.minEase, Math.min(displayMax, item.ease)) - SR_CONFIG.minEase) / (displayMax - SR_CONFIG.minEase)) * 100);
     const color = pct < 34 ? 'var(--ease-bad)' : pct < 67 ? 'var(--ease-warn)' : 'var(--ease-good)';
-    return `<div class="sr-ease-meter"><span>Kolaylık</span><span class="sr-ease-track"><span class="sr-ease-fill" style="width:${pct}%;background:${color};"></span></span><span>${Number(item.ease || SR_CONFIG.startingEase).toFixed(2)}</span>${item.isLeech ? '<span class="sr-leech">🩸 Takıldığın soru</span>' : ''}</div>`;
+    return `<div class="sr-ease-meter"><span>Kolaylık</span><span class="sr-ease-track"><span class="sr-ease-fill" style="width:${pct}%;background:${color};"></span></span><span>${Number(item.ease || SR_CONFIG.startingEase).toFixed(2)}</span>${item.isLeech ? '<span class="sr-leech" title="Bu soru sık tekrarlandı. Çözüm notunu gözden geçir veya konu anlatımına geri dön.">🩸 Takıldığın soru · Çözüm notunu gözden geçir</span>' : ''}</div>`;
 }
 
 function renderSRDue() {
     const container = document.getElementById('srDueGrid');
     if (!container) return;
+    prepareSRSessionRuntime();
     updateSRSessionPlanner();
+    const resume=document.getElementById('srSessionResumePrompt');
+    if(srSessionResumePending&&srSessionRestoredRuntime){
+        if(resume)resume.innerHTML=`<div class="sr-session-complete" style="margin-top:10px"><strong>Yarım kalan tekrar oturumu bulundu.</strong><div class="sr-complete-actions"><button onclick="continueStoredSRSession()">Devam et</button><button class="sync-export" onclick="discardStoredSRSession()">Yeni oturum başlat</button></div></div>`;
+        container.innerHTML='';return;
+    }
+    if(resume)resume.innerHTML='';
+    const sessionNoticeHTML=srSessionNotice?`<div class="sr-upload-status ok" style="margin:0 0 10px;padding:10px 12px;border:1px solid currentColor;border-radius:10px;">${htmlSafe(srSessionNotice)}</div>`:'';
     const actualDueItems = getDueSRItems(srSessionMode === 'selected' ? srSessionCategory : '');
     const actualDueIds = actualDueItems.map(item => item.id);
 
     if (!srSessionStarted) resetSRSession(srSessionLimit);
-    const activeSRIds = new Set(appData.srPool.filter(item => item.status !== 'archived').map(item => item.id));
-    srSessionQueue = srSessionQueue.filter(id => activeSRIds.has(id));
+    const activeSRIds = new Set(appData.srPool.filter(item => item.status !== 'archived').map(item => getSRSessionItemKey(item.id)));
+    srSessionQueue = normalizeSRSessionQueueIds(srSessionQueue.filter(id => activeSRIds.has(getSRSessionItemKey(id))));
+    syncSRSessionRequeuedCount();
+    if(srSessionStarted&&srSessionQueue.length)persistSRSessionRuntime();
 
     const dueLabel = document.getElementById('srDueLabel');
     if (dueLabel) dueLabel.textContent = `${actualDueIds.length} hazır · ${srSessionQueue.length} seansta`;
 
     if (srSessionFinished) {
-        container.innerHTML = `<div class="sr-session-complete"><h3>Bugünkü tekrar seansını kapattın 🌿</h3><p style="color:var(--text-muted);margin:0 0 12px;">${srSessionCompleted} ana soru işlendi. ${actualDueIds.length} soru daha bekliyor.</p>${actualDueIds.length ? '<button onclick="startConfiguredSRSession()">Yeni seans başlat</button>' : ''}</div>`;
+        container.innerHTML = `${sessionNoticeHTML}<div class="sr-session-complete"><h3>Bugünkü tekrar seansını kapattın 🌿</h3><p style="color:var(--text-muted);margin:0 0 12px;">${srSessionCompleted} ana soru işlendi. ${actualDueIds.length} soru daha bekliyor.</p>${actualDueIds.length ? '<button onclick="startConfiguredSRSession()">Yeni seans başlat</button>' : ''}</div>`;
         return;
     }
 
     if (!srSessionQueue.length) {
+        if(srSessionStarted)clearSRSessionRuntime();
         const remaining = actualDueIds.length;
-        container.innerHTML = `<div class="sr-session-complete">
+        container.innerHTML = `${sessionNoticeHTML}<div class="sr-session-complete">
             <h3>${remaining ? 'Ana seans tamamlandı 🎉' : 'Bugünkü tekrarlar tamamlandı 🎉'}</h3>
             <p style="color:var(--text-muted);margin:0;">${srSessionCompleted ? `${srSessionCompleted} ana soru işlendi.` : 'Bugün zamanı gelmiş soru yok.'}${remaining ? ` ${remaining} soru daha hazır.` : ''}</p>
             ${remaining ? `<div class="sr-complete-actions"><button onclick="finishSRSessionForToday()">Bugünü tamamla</button><button onclick="addMoreToSRSession(5)">＋ 5 soru daha</button><button class="sync-export" onclick="addMoreToSRSession(9999)">Hepsine devam et</button></div>` : ''}
@@ -7784,7 +8036,7 @@ function renderSRDue() {
     }
 
     const item = appData.srPool.find(x => x.id === srSessionQueue[0]);
-    if (!item) return;
+    if (!item) {srSessionQueue.shift();persistSRSessionRuntime();return renderSRDue();}
     normalizeSRItem(item);
     const preview = getSRReviewPreview(item);
     const total = Math.max(srSessionInitialCount, srSessionCompleted + srSessionQueue.length);
@@ -7795,11 +8047,11 @@ function renderSRDue() {
     const solutionDriveId = item.solutionImageFileId || '';
     const solutionLocalId = item.solutionImgId || '';
 
-    container.innerHTML = `<div class="sr-session-shell">
+    container.innerHTML = `${sessionNoticeHTML}<div class="sr-session-shell">
         <div class="sr-session-top">
             <div class="sr-session-progress-copy">${currentNo} / ${total}</div>
             <div class="sr-session-progress-bg"><div class="sr-session-progress-fill" style="width:${progress}%"></div></div>
-            <span class="sr-chip">${srSessionQueue.length} kaldı</span>
+            <span class="sr-chip">${srSessionQueue.length} kalan · ${srSessionCompleted} tamamlanan · ${srSessionRequeued} yeniden sırada</span>
         </div>
         <article class="sr-session-card ${item.category || ''}">
             <div class="sr-due-head">
@@ -7837,13 +8089,16 @@ function renderSRDue() {
                         <input id="sr-custom-date-${item.id}" type="date" min="${getTodayStr()}" class="form-control" onchange="scheduleSRCustomDate('${item.id}','sr-custom-date-${item.id}')">
                         <button type="button" onclick="openSRDatePicker('sr-custom-date-${item.id}')">📅 Takvimi Aç</button>
                     </div>
+                    <button type="button" class="sync-export" onclick="clearSRManualOverride('${item.id}')">Otomatiğe dön</button>
                 </div>
 
                 <div class="sr-session-actions-title">Değerlendirmeden ertele</div>
                 <div class="sr-snooze-row">
                     <button onclick="moveSRToSessionEnd('${item.id}')">Bugün sonra göster</button>
                     <button onclick="postponeSRTomorrow('${item.id}')">Yarına ertele</button>
-                    <button onclick="openSRDatePicker('sr-custom-date-${item.id}')">Özel tarih seç</button>
+                    <button onclick="postponeSRItem('${item.id}','threeDays')">3 gün ertele</button>
+                    <input id="sr-snooze-date-${item.id}" type="date" min="${getTodayStr()}" class="form-control" aria-label="Özel erteleme tarihi">
+                    <button onclick="postponeSRItem('${item.id}','customDate','sr-snooze-date-${item.id}')">Özel tarihe ertele</button>
                 </div>
                 ${renderSRHistory(item)}
             </div>
@@ -7856,13 +8111,16 @@ function renderSRDue() {
 function renderSRStats() {
     const today = getTodayStr();
     const active = appData.srPool.filter(x => x.status !== 'archived');
-    const due = active.filter(x => String(x.nextReview || '') <= today).length;
-    const reviews = active.reduce((sum,x) => sum + Number(x.reviewCount || 0), 0);
-    const learning = active.filter(x => ['new','learning','relearning'].includes(x.state)).length;
-    const dueEl = document.getElementById('srStatDue'); if (dueEl) dueEl.textContent = due;
-    const totalEl = document.getElementById('srStatTotal'); if (totalEl) totalEl.textContent = active.length;
-    const revEl = document.getElementById('srStatReviews'); if (revEl) revEl.textContent = reviews;
-    const learnEl = document.getElementById('srStatLearning'); if (learnEl) learnEl.textContent = learning;
+    active.forEach(normalizeSRItem);
+    const isNew=x=>x.state==='new'||Number(x.reviewCount||0)===0;
+    const newCount=active.filter(isNew).length;
+    const overdue=active.filter(x=>!isNew(x)&&String(x.nextReview||'')<today).length;
+    const dueToday=active.filter(x=>!isNew(x)&&String(x.nextReview||'')===today).length;
+    const ready=srSessionResumePending&&srSessionRestoredRuntime?srSessionRestoredRuntime.queueItemIds.length:srSessionQueue.length;
+    const overdueEl=document.getElementById('srStatOverdue');if(overdueEl)overdueEl.textContent=overdue;
+    const todayEl=document.getElementById('srStatToday');if(todayEl)todayEl.textContent=dueToday;
+    const newEl=document.getElementById('srStatNew');if(newEl)newEl.textContent=newCount;
+    const readyEl=document.getElementById('srStatReady');if(readyEl)readyEl.textContent=ready;
 }
 
 function renderSRLibrary() {
@@ -7902,6 +8160,7 @@ function renderSRLibrary() {
             <div class="sr-library-schedule">
                 <input id="sr-library-date-${item.id}" type="date" min="${getTodayStr()}" value="${htmlSafe(item.nextReview || '')}" class="form-control" aria-label="Manuel tekrar tarihi">
                 <button type="button" onclick="scheduleSRCustomDate('${item.id}','sr-library-date-${item.id}')">Tarihi Kaydet</button>
+                <button type="button" class="sync-export" onclick="clearSRManualOverride('${item.id}')">Otomatiğe dön</button>
             </div>
             <div class="sr-library-image" id="sr-library-image-${item.id}">
                 <div class="sr-image-loading">☁️ Soru görseli yükleniyor...</div>
@@ -7913,8 +8172,8 @@ function renderSRLibrary() {
 
 async function renderSRTab() {
     appData.srPool.forEach(normalizeSRItem);
-    renderSRStats();
     renderSRDue();
+    renderSRStats();
     renderSRLibrary();
 }
 
@@ -8238,13 +8497,15 @@ function getCategoryKeys(includeKriz = false) {
     if (includeKriz) keys.push('kriz');
     return [...new Set(keys)];
 }
-function refreshCategorySelect(selectId, includeKriz = false) {
+function refreshCategorySelect(selectId, includeKriz = false, includeAll = false) {
     const el = document.getElementById(selectId);
     if (!el) return;
     const prev = el.value;
     const keys = getCategoryKeys(includeKriz);
-    el.innerHTML = keys.map(cat => `<option value="${htmlSafe(cat)}">${htmlSafe(catNames[cat] || cat)}</option>`).join('');
-    if (keys.includes(prev)) el.value = prev;
+    const allOption = includeAll ? '<option value="">Tüm dersler</option>' : '';
+    el.innerHTML = allOption + keys.map(cat => `<option value="${htmlSafe(cat)}">${htmlSafe(catNames[cat] || cat)}</option>`).join('');
+    if (keys.includes(prev) || (includeAll && prev === '')) el.value = prev;
+    else if (includeAll) el.value = '';
 }
 function renderCustomCourseList() {
     const el = document.getElementById('customCourseList');
@@ -8328,7 +8589,7 @@ function refreshAllCategoryControls() {
     refreshCategorySelect('playlistGroupCat');
     refreshCategorySelect('modalCategory', true);
     refreshCategorySelect('srInputCategory');
-    refreshCategorySelect('srFilterCategory');
+    refreshCategorySelect('srFilterCategory', false, true);
     initKonuSourceSelectors();
     renderModalCategoryPicker();
     renderCategoryIconSettings();
