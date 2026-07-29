@@ -2734,6 +2734,7 @@
                 <div class="konu-add-source-tabs" id="playlistGroupSourceTabs"></div>
             </div>
             <div class="new-group-summary" id="playlistImportTargetSummary">CSV hedefini seç.</div>
+            <div class="new-group-summary" id="playlistImportPreview" style="display:none;" aria-live="polite"></div>
             <div class="new-konu-group-row" style="align-items:center;">
                 <input type="file" id="playlistCsvFile" accept=".csv,.txt,text/csv,text/plain" class="form-control" style="max-width:420px; padding:7px 10px;">
                 <label style="color:var(--text-muted); font-size:0.85rem; display:flex; align-items:center; gap:6px;">
@@ -2745,7 +2746,8 @@ Title,Duration
 Temel Kavramlar 01 | 1.Gün 1.Ders | 48 Günde TYT Matematik Kampı 2027,&quot;34 Minutes, 57 Seconds&quot;
 Temel Kavramlar 01 | 1.Gün 2.Ders | 48 Günde TYT Matematik Kampı 2027,&quot;45 Minutes, 28 Seconds&quot;"></textarea>
             <div class="modal-actions" style="justify-content:flex-start; margin-top:12px;">
-                <button onclick="importPlaylistTextToKonu()">CSV’yi Kaynak Takibine Aktar</button>
+                <button type="button" onclick="previewPlaylistImport()">Önizle</button>
+                <button type="button" onclick="importPlaylistTextToKonu()">İçe Aktar</button>
                 <button class="danger" onclick="clearPlaylistImportBox()">Temizle</button>
             </div>
         </div>
@@ -6859,20 +6861,25 @@ function getTodayStr() { return formatLocalDate(new Date()); }
 
 const TASK_PRIORITY_LABELS={must:'Bugün mutlaka',important:'Önemli',optional:'Vakit kalırsa',none:'Öncelik yok'};
 const TASK_PRIORITY_ORDER={must:0,important:1,none:2,optional:3};
+function canonicalTaskId(value){return String(value??'')}
+function taskIdMatches(task,value){return !!task&&canonicalTaskId(task.id)===canonicalTaskId(value)}
+function findTaskById(list,taskId){return(list||[]).find(task=>taskIdMatches(task,taskId))}
+function findTaskIndexById(list,taskId){return(list||[]).findIndex(task=>taskIdMatches(task,taskId))}
+function taskNotFound(){alert('Görev bulunamadı. Liste başka bir cihazda değişmiş olabilir; veriyi yenileyip tekrar dene.')}
 function getTaskPriority(task){return task&&Object.prototype.hasOwnProperty.call(TASK_PRIORITY_LABELS,task.priority)?task.priority:'none'}
 function sortTasksForDisplay(tasks){return(tasks||[]).map((task,index)=>({task,index})).sort((a,b)=>TASK_PRIORITY_ORDER[getTaskPriority(a.task)]-TASK_PRIORITY_ORDER[getTaskPriority(b.task)]||a.index-b.index).map(x=>x.task)}
 function isDailyTaskList(listId){return daysOfWeek.includes(listId)}
-function confirmDuplicateMust(listId,taskId){if(!isDailyTaskList(listId))return true;const duplicate=getList(listId).some(task=>task.id!==taskId&&!task.checked&&getTaskPriority(task)==='must');return!duplicate||confirm("Bu gün için zaten bir ‘Bugün mutlaka’ görevi var. Yeni görevi de aynı öncelikle kaydetmek istiyor musun?")}
+function confirmDuplicateMust(listId,taskId){if(!isDailyTaskList(listId))return true;const duplicate=getList(listId).some(task=>!taskIdMatches(task,taskId)&&!task.checked&&getTaskPriority(task)==='must');return!duplicate||confirm("Bu gün için zaten bir ‘Bugün mutlaka’ görevi var. Yeni görevi de aynı öncelikle kaydetmek istiyor musun?")}
 function renderTaskPriorityMenu(task,listId){const priority=getTaskPriority(task),label=TASK_PRIORITY_LABELS[priority],summary=priority==='none'?'☆':label;return`<details class="task-priority-menu" onclick="event.stopPropagation()"><summary class="priority-${priority}" title="Görev önceliğini değiştir" aria-label="Öncelik: ${htmlSafe(label)}">${summary}</summary><div class="task-priority-menu-panel">${['must','important','none','optional'].map(value=>`<button type="button" class="priority-${value}" onclick="updateTaskPriority('${listId}','${task.id}','${value}')">${TASK_PRIORITY_LABELS[value]}</button>`).join('')}</div></details>`}
-function updateTaskPriority(listId,taskId,priority){if(!Object.prototype.hasOwnProperty.call(TASK_PRIORITY_LABELS,priority))return;const list=getList(listId),task=list.find(item=>item.id===taskId);if(!task||priority==='must'&&!confirmDuplicateMust(listId,taskId))return;task.priority=priority;saveData();changeWeek()}
+function updateTaskPriority(listId,taskId,priority){if(!Object.prototype.hasOwnProperty.call(TASK_PRIORITY_LABELS,priority))return;const list=getList(listId),task=findTaskById(list,taskId);if(!task)return taskNotFound();if(priority==='must'&&!confirmDuplicateMust(listId,taskId))return;task.priority=priority;saveData();changeWeek()}
 function getTodayTaskContext(){const now=new Date(),weekKey=getWeekKeyForDate(now),day=daysOfWeek[(now.getDay()+6)%7];ensureWeekExists(weekKey);return{weekKey,day,tasks:appData.weeks[weekKey].days[day]||[]}}
 function getTodayPriorityTasks(){return sortTasksForDisplay(getTodayTaskContext().tasks.filter(task=>!task.checked&&getTaskPriority(task)==='must'))}
 function renderTodayPriority(){const el=document.getElementById('todayPriorityCard');if(!el)return;const tasks=getTodayPriorityTasks();if(!tasks.length){el.innerHTML='<div class="today-priority-card-head"><h3>🎯 Bugünün tek önceliği</h3></div><div class="today-priority-empty"><span>Bugün için “Bugün mutlaka” görevi seçilmedi.</span><button type="button" onclick="focusTodayTasks()">Görevlerden seç</button></div>';return}const first=tasks[0],context=[catNames[first.category]||first.category,first.topicName,first.sourceName].filter(Boolean).map(htmlSafe).join(' · ');el.innerHTML=`<div class="today-priority-card-head"><h3>🎯 Bugünün tek önceliği</h3><span class="priority-must">Bugün mutlaka</span></div><div class="today-priority-main"><div class="today-priority-copy"><strong>${htmlSafe(first.title)}</strong><span>${context}${context?' · ':''}${Number(first.est)||0} dk</span></div><button type="button" onclick="completeTodayPriority('${first.id}')">Tamamla</button></div>${tasks.length>1?`<div class="today-priority-warning">Bugün için ${tasks.length} aktif “Bugün mutlaka” görevi var.</div><ul class="today-priority-more">${tasks.slice(1).map(task=>`<li>${htmlSafe(task.title)} · ${Number(task.est)||0} dk</li>`).join('')}</ul>`:''}`}
-function completeTodayPriority(taskId){const context=getTodayTaskContext(),task=context.tasks.find(item=>item.id===taskId);if(!task)return;if(context.weekKey===currentWeekStr){toggleTask(context.day,taskId,true);return}task.checked=true;if(task.isSR&&task.srId){const srItem=appData.srPool.find(item=>item.id===task.srId);if(srItem){applySRReview(srItem,'good');cleanupPendingSRTasks(task.srId,task.id)}}saveData();changeWeek()}
+function completeTodayPriority(taskId){const context=getTodayTaskContext(),task=findTaskById(context.tasks,taskId);if(!task)return taskNotFound();if(context.weekKey===currentWeekStr){toggleTask(context.day,taskId,true);return}task.checked=true;if(task.isSR&&task.srId){const srItem=appData.srPool.find(item=>item.id===task.srId);if(srItem){applySRReview(srItem,'good');cleanupPendingSRTasks(task.srId,task.id)}}saveData();changeWeek()}
 function focusTodayTaskColumn(){goToCurrentDashboardWeek();requestAnimationFrame(()=>{const context=getTodayTaskContext(),list=document.getElementById('list-'+context.day),column=list?.closest('.day-column');if(column){column.scrollIntoView({behavior:'smooth',block:'center',inline:'center'});column.animate([{boxShadow:'0 0 0 0 rgba(184,50,104,0)'},{boxShadow:'0 0 0 4px rgba(184,50,104,.32)'},{boxShadow:'0 0 0 0 rgba(184,50,104,0)'}],{duration:1100});column.querySelector('.add-task-btn')?.focus()}})}
 function focusTodayTasks(){const modal=document.getElementById('todayTaskPickerModal'),list=document.getElementById('todayTaskPickerList'),context=getTodayTaskContext(),tasks=sortTasksForDisplay(context.tasks.filter(task=>!task.checked));if(!modal||!list)return;list.innerHTML=tasks.length?tasks.map(task=>`<div class="today-task-picker-item"><span><strong>${htmlSafe(task.title)}</strong><small>${htmlSafe(catNames[task.category]||task.category||'Ders')} · ${Number(task.est)||0} dk</small></span><button type="button" onclick="chooseTodayPriorityTask('${task.id}')">Seç</button></div>`).join(''):'<div class="study-log-empty">Bugün için seçilebilecek tamamlanmamış görev yok.<br><button type="button" style="margin-top:9px" onclick="closeTodayTaskPicker();focusTodayTaskColumn()">Bugünün görevlerine git</button></div>';modal.style.display='flex'}
 function closeTodayTaskPicker(){document.getElementById('todayTaskPickerModal').style.display='none'}
-function chooseTodayPriorityTask(taskId){const context=getTodayTaskContext(),task=context.tasks.find(item=>item.id===taskId);if(!task||!confirmDuplicateMust(context.day,taskId))return;task.priority='must';saveData();closeTodayTaskPicker();changeWeek()}
+function chooseTodayPriorityTask(taskId){const context=getTodayTaskContext(),task=findTaskById(context.tasks,taskId);if(!task)return taskNotFound();if(!confirmDuplicateMust(context.day,taskId))return;task.priority='must';saveData();closeTodayTaskPicker();changeWeek()}
 
 /* =====================================================================
    TASK HTML
@@ -7036,12 +7043,13 @@ function closeWeeklyTaskDetail() {
 }
 
 function openWeeklyTaskDetail(day, taskId) {
-    const task = (getSelectedWeekData().days?.[day] || []).find(item=>item.id===taskId);
+    const task = findTaskById(getSelectedWeekData().days?.[day] || [],taskId);
     const modal = document.getElementById('weeklyTaskDetailModal');
     const title = document.getElementById('weeklyTaskDetailTitle');
     const body = document.getElementById('weeklyTaskDetailBody');
     const actions = document.getElementById('weeklyTaskDetailActions');
-    if (!task || !modal || !title || !body || !actions) return;
+    if (!task) return taskNotFound();
+    if (!modal || !title || !body || !actions) return;
     const priority = getTaskPriority(task);
     const energyLabels = {high:'Yüksek',mid:'Orta',low:'Düşük'};
     title.textContent = task.title || 'Görev ayrıntısı';
@@ -7064,7 +7072,8 @@ function openPushModal(taskId, listId) {
     pushTargetTaskId = { taskId, listId };
     const weekData = appData.weeks[currentWeekStr];
     // Find task title
-    const task = weekData.weekly.find(t => t.id === taskId) || appData.monthly.find(t=>t.id===taskId);
+    const task = findTaskById(weekData.weekly,taskId) || findTaskById(appData.monthly,taskId);
+    if (!task) return taskNotFound();
     document.getElementById('pushTaskLabel').textContent = task ? `"${task.title}"` : '';
 
     const grid = document.getElementById('dayPickGrid');
@@ -7083,8 +7092,8 @@ function confirmPush(day) {
     const { taskId, listId } = pushTargetTaskId;
     const weekData = appData.weeks[currentWeekStr];
     let sourceList = listId === 'monthly' ? appData.monthly : weekData.weekly;
-    const taskIdx = sourceList.findIndex(t => t.id === taskId);
-    if (taskIdx === -1) return;
+    const taskIdx = findTaskIndexById(sourceList,taskId);
+    if (taskIdx === -1) return taskNotFound();
     const task = JSON.parse(JSON.stringify(sourceList[taskIdx]));
     if(getTaskPriority(task)==='must'&&!confirmDuplicateMust(day,null))return;
     task.id = generateId(); // yeni id ile kopyala (orijinal havuzda kalsın)
@@ -7104,8 +7113,8 @@ function getList(listId) {
 }
 function toggleTask(listId, taskId, isChecked) {
     const list = getList(listId);
-    const task = list.find(t => t.id === taskId);
-    if (!task) return;
+    const task = findTaskById(list,taskId);
+    if (!task) return taskNotFound();
     task.checked = isChecked;
     if (isChecked && task.isSR && task.srId) {
         const srItem = appData.srPool.find(x => x.id === task.srId);
@@ -7118,13 +7127,15 @@ function toggleTask(listId, taskId, isChecked) {
 }
 function updateActual(listId, taskId, value) {
     const list = getList(listId);
-    const task = list.find(t => t.id === taskId);
-    if (task) { task.act = parseInt(value)||0; saveData(); }
+    const task = findTaskById(list,taskId);
+    if (!task) return taskNotFound();
+    task.act = parseInt(value)||0; saveData();
 }
 function deleteTask(listId, taskId) {
     if (!confirm('Silinsin mi?')) return;
     const list = getList(listId);
-    const idx = list.findIndex(t => t.id === taskId);
+    const idx = findTaskIndexById(list,taskId);
+    if (idx === -1) return taskNotFound();
     if (idx > -1) {
         const task = list[idx];
         if (task.imgId && !task.isSR) deleteImage(task.imgId);
@@ -7164,7 +7175,7 @@ function openModal(listId) {
     document.getElementById('modalPriority').value = 'none';
     document.getElementById('modalTaskName').focus();
 }
-function openTaskEdit(listId,taskId){const task=getList(listId).find(item=>item.id===taskId);if(!task)return;targetListIdForModal=listId;editingTaskId=taskId;document.getElementById('modalTaskName').value=task.title||'';document.getElementById('modalCategory').value=task.category||'ayt_mat';document.getElementById('modalEnergy').value=task.energy||'mid';document.getElementById('modalEst').value=Number(task.est)||45;document.getElementById('modalPriority').value=getTaskPriority(task);renderModalCategoryPicker();document.getElementById('modalTitle').textContent='Görevi Düzenle';document.getElementById('modalSaveTaskBtn').textContent='Değişiklikleri Kaydet';document.getElementById('taskModal').style.display='flex';document.getElementById('modalTaskName').focus()}
+function openTaskEdit(listId,taskId){const task=findTaskById(getList(listId),taskId);if(!task)return taskNotFound();targetListIdForModal=listId;editingTaskId=canonicalTaskId(task.id);document.getElementById('modalTaskName').value=task.title||'';document.getElementById('modalCategory').value=task.category||'ayt_mat';document.getElementById('modalEnergy').value=task.energy||'mid';document.getElementById('modalEst').value=Number(task.est)||45;document.getElementById('modalPriority').value=getTaskPriority(task);renderModalCategoryPicker();document.getElementById('modalTitle').textContent='Görevi Düzenle';document.getElementById('modalSaveTaskBtn').textContent='Değişiklikleri Kaydet';document.getElementById('taskModal').style.display='flex';document.getElementById('modalTaskName').focus()}
 function closeModal() { document.getElementById('taskModal').style.display = 'none'; editingTaskId=null; }
 function saveTask() {
     const title = document.getElementById('modalTaskName').value.trim();
@@ -7175,7 +7186,7 @@ function saveTask() {
     const list = getList(targetListIdForModal);
     const priority = document.getElementById('modalPriority').value;
     if(priority==='must'&&!confirmDuplicateMust(targetListIdForModal,editingTaskId))return;
-    if(editingTaskId){const task=list.find(item=>item.id===editingTaskId);if(!task)return;Object.assign(task,{title,category,energy,est,priority:getTaskPriority({priority})})}
+    if(editingTaskId){const task=findTaskById(list,editingTaskId);if(!task)return taskNotFound();Object.assign(task,{title,category,energy,est,priority:getTaskPriority({priority})})}
     else list.push({ id: generateId(), title, category, energy, est, act:'', checked:false, imgId:null, priority:getTaskPriority({priority}) });
     saveData(); changeWeek(); closeModal();
 }
@@ -8618,12 +8629,44 @@ function slugifyCategoryName(name) {
 }
 function applyCustomCategories() {
     if (!Array.isArray(appData.customCategories)) appData.customCategories = [];
+    if (!appData.categoryRenames) appData.categoryRenames = {};
+    Object.keys(appData.categoryRenames).forEach(key => {
+        const name = String(appData.categoryRenames[key] || '').trim();
+        if (name && catNames[key]) catNames[key] = name;
+    });
     appData.customCategories.forEach(cat => {
         if (!cat || !cat.key || !cat.name) return;
         catNames[cat.key] = cat.name;
         catIcons[cat.key] = cat.icon || '📚';
         if (!defaultCatIcons[cat.key]) defaultCatIcons[cat.key] = cat.icon || '📚';
     });
+}
+function renameCourseCategory(key) {
+    const current = catNames[key] || key;
+    const next = prompt('Ders adını değiştir:', current);
+    if (next === null) return;
+    const name = next.trim();
+    if (!name) return alert('Ders adı boş olamaz.');
+    const duplicate = getCategoryKeys(true).some(other => other !== key && String(catNames[other] || other).toLocaleLowerCase('tr-TR') === name.toLocaleLowerCase('tr-TR'));
+    if (duplicate) return alert('Bu isimde başka bir ders zaten var.');
+    const custom = (appData.customCategories || []).find(cat => cat.key === key);
+    if (custom) custom.name = name;
+    else {
+        if (!appData.categoryRenames) appData.categoryRenames = {};
+        appData.categoryRenames[key] = name;
+    }
+    catNames[key] = name;
+    const trackerSubject = (appData.topicTracker?.subjects || []).find(subject => subject.id === 'tracker_' + key);
+    if (trackerSubject) trackerSubject.name = name;
+    (appData.studySessions || []).forEach(session => {
+        if (session.subjectKey === key) session.subjectName = name;
+    });
+    saveData();
+    refreshAllCategoryControls();
+    renderCustomCourseList();
+    renderKonuTab();
+    renderTopicTracker();
+    renderStudySessions();
 }
 function getCategoryKeys(includeKriz = false) {
     const base = ['prob','ayt_mat','geo','ilk_12','fiz'];
@@ -8648,6 +8691,7 @@ function renderCustomCourseList() {
     const list = appData.customCategories || [];
     el.innerHTML = list.length ? list.map(cat =>
         `<span class="custom-course-chip">${htmlSafe(cat.icon || '📚')} ${htmlSafe(cat.name)}
+            <button type="button" title="Ders adını değiştir" onclick="renameCourseCategory('${jsSafe(cat.key)}')">Düzenle</button>
             <button type="button" title="Dersi sil" onclick="deleteCustomCategory('${jsSafe(cat.key)}')">×</button>
         </span>`
     ).join('') : '<span class="konu-source-add-hint">Henüz özel ders eklenmedi.</span>';
@@ -8965,6 +9009,23 @@ function clearPlaylistImportBox() {
     document.getElementById('playlistImportText').value = '';
     const fileInput = document.getElementById('playlistCsvFile');
     if (fileInput) fileInput.value = '';
+    const preview = document.getElementById('playlistImportPreview');
+    if (preview) { preview.innerHTML = ''; preview.style.display = 'none'; }
+}
+function previewPlaylistImport() {
+    const raw = document.getElementById('playlistImportText').value;
+    const preview = document.getElementById('playlistImportPreview');
+    const items = parsePlaylistImport(raw);
+    if (!preview) return items;
+    preview.style.display = 'block';
+    if (!items.length) {
+        preview.innerHTML = '<strong>Önizleme:</strong> Geçerli başlık ve süre bulunamadı.';
+        return items;
+    }
+    const totalSec = items.reduce((sum,item)=>sum+(item.durationSec||0),0);
+    const rows = items.slice(0,8).map((item,index)=>`${index+1}. ${htmlSafe(getKonuLabel(item))}${getKonuDuration(item)?` · ${htmlSafe(getKonuDuration(item))}`:''}`).join('<br>');
+    preview.innerHTML = `<strong>Önizleme: ${items.length} kayıt${totalSec?' · '+htmlSafe(formatDurationTotal(totalSec)):''}</strong><div style="margin-top:7px">${rows}${items.length>8?`<br>… ve ${items.length-8} kayıt daha`:''}</div>`;
+    return items;
 }
 function importPlaylistTextToKonu() {
     const raw = document.getElementById('playlistImportText').value;
@@ -8974,7 +9035,7 @@ function importPlaylistTextToKonu() {
     const sourcePreset = getSourcePreset(cat, sourceKey);
     if (!cat) return alert('Önce ders / kategori seçmelisin.');
     if (!sourcePreset || !sourcePreset.key) return alert('Önce kaynak / alt sekme seçmelisin.');
-    const items = parsePlaylistImport(raw);
+    const items = previewPlaylistImport();
     if (!items.length) {
         alert('Başlık/süre ayıklayamadım. En temiz format: Title,Duration kolonlu CSV. Duration örn: "34 Minutes, 57 Seconds" veya 34:57.');
         return;
@@ -9006,7 +9067,7 @@ if (playlistCsvFileInput) {
         const file = ev.target.files && ev.target.files[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = e => { document.getElementById('playlistImportText').value = e.target.result || ''; };
+        reader.onload = e => { document.getElementById('playlistImportText').value = e.target.result || ''; previewPlaylistImport(); };
         reader.onerror = () => alert('CSV dosyası okunamadı. İçeriği kopyalayıp kutuya yapıştırabilirsin.');
         reader.readAsText(file, 'UTF-8');
     });
@@ -9245,7 +9306,7 @@ function renderKonuTab() {
             <h2 class="konu-section-toggle" onclick="toggleKonuSection('${cat}')">
                 <span class="konu-section-title"><span class="konu-caret">▶</span><span>${catIconMarkup(cat)} ${catNames[cat] || cat}</span></span>
                 <span class="konu-section-progress" title="${catPct}% tamamlandı"><span class="konu-section-progress-fill" style="width:${catPct}%;background:${catFillColor};"></span></span>
-                <span class="konu-section-meta"><span>${catGroups.length} grup</span><span>${catDone}/${catTotal}</span><span class="konu-section-percent">${catPct}%</span></span>
+                <span class="konu-section-meta"><button type="button" class="konu-group-edit-btn" onclick="event.preventDefault();event.stopPropagation();renameCourseCategory('${jsSafe(cat)}')">Düzenle</button><span>${catGroups.length} grup</span><span>${catDone}/${catTotal}</span><span class="konu-section-percent">${catPct}%</span></span>
             </h2>
             <div class="konu-section-body">`;
 
