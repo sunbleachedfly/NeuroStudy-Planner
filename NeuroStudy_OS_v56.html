@@ -811,6 +811,7 @@
         .konu-source-delete-btn:hover { color:#fff; border-color:rgba(248,81,73,0.55); background:rgba(248,81,73,0.12); }
         .konu-group-edit-btn { background:transparent; border:1px solid rgba(240,246,252,0.10); color:var(--text-muted); border-radius:999px; padding:4px 8px; font-size:.72rem; box-shadow:none; }
         .konu-group-edit-btn:hover { color:#fff; border-color:rgba(88,166,255,0.35); background:rgba(88,166,255,0.08); }
+        .konu-category-rename-btn { flex:0 0 auto; min-height:28px !important; padding:4px 8px !important; white-space:nowrap; }
 
 
     
@@ -935,6 +936,8 @@
                 grid-template-columns: repeat(2, minmax(105px, 1fr));
             }
             .management-title { align-items:flex-start; flex-direction:column; gap:3px; }
+            .konu-category-rename-btn { min-width:30px; padding:4px 6px !important; font-size:0; }
+            .konu-category-rename-btn::before { content:'✏️'; font-size:.75rem; }
         }
 
 
@@ -3313,6 +3316,7 @@ if (!Array.isArray(appData.konuGroups)) appData.konuGroups = [];
 if (!appData.konuOpenCats) appData.konuOpenCats = {};
 if (!appData.customCatIcons) appData.customCatIcons = {};
 if (!Array.isArray(appData.customCategories)) appData.customCategories = [];
+if (!appData.categoryRenames || typeof appData.categoryRenames !== 'object' || Array.isArray(appData.categoryRenames)) appData.categoryRenames = {};
 ensureTopicTrackerData();
 applyCustomCategories();
 applyCustomCatIcons();
@@ -7154,11 +7158,11 @@ function openWeeklyTaskDetail(day, taskId) {
    PUSH TO DAY MODAL
    ===================================================================== */
 function openPushModal(taskId, listId) {
-    pushTargetTaskId = { taskId, listId };
     const weekData = appData.weeks[currentWeekStr];
     // Find task title
     const task = findTaskById(weekData.weekly,taskId) || findTaskById(appData.monthly,taskId);
     if (!task) return taskNotFound();
+    pushTargetTaskId = { taskId: canonicalTaskId(task.id), listId };
     document.getElementById('pushTaskLabel').textContent = task ? `"${task.title}"` : '';
 
     const grid = document.getElementById('dayPickGrid');
@@ -7217,10 +7221,10 @@ function updateActual(listId, taskId, value) {
     task.act = parseInt(value)||0; saveData();
 }
 function deleteTask(listId, taskId) {
-    if (!confirm('Silinsin mi?')) return;
     const list = getList(listId);
     const idx = findTaskIndexById(list,taskId);
     if (idx === -1) return taskNotFound();
+    if (!confirm('Silinsin mi?')) return;
     if (idx > -1) {
         const task = list[idx];
         if (task.imgId && !task.isSR) deleteImage(task.imgId);
@@ -8717,7 +8721,7 @@ function slugifyCategoryName(name) {
 }
 function applyCustomCategories() {
     if (!Array.isArray(appData.customCategories)) appData.customCategories = [];
-    if (!appData.categoryRenames) appData.categoryRenames = {};
+    if (!appData.categoryRenames || typeof appData.categoryRenames !== 'object' || Array.isArray(appData.categoryRenames)) appData.categoryRenames = {};
     Object.keys(appData.categoryRenames).forEach(key => {
         const name = String(appData.categoryRenames[key] || '').trim();
         if (name && catNames[key]) catNames[key] = name;
@@ -8731,6 +8735,8 @@ function applyCustomCategories() {
     });
 }
 function renameCourseCategory(key) {
+    key = String(key || '');
+    if (!key || !Object.prototype.hasOwnProperty.call(catNames,key)) return alert('Ders bulunamadı.');
     const current = catNames[key] || key;
     const next = prompt('Ders adını değiştir:', current);
     if (next === null) return;
@@ -8739,14 +8745,18 @@ function renameCourseCategory(key) {
     const duplicate = getCategoryKeys(true).some(other => other !== key && String(catNames[other] || other).toLocaleLowerCase('tr-TR') === name.toLocaleLowerCase('tr-TR'));
     if (duplicate) return alert('Bu isimde başka bir ders zaten var.');
     const custom = (appData.customCategories || []).find(cat => cat.key === key);
-    if (custom) custom.name = name;
+    if (custom) {
+        custom.name = name;
+        delete appData.categoryRenames[key];
+    }
     else {
         if (!appData.categoryRenames) appData.categoryRenames = {};
         appData.categoryRenames[key] = name;
     }
     catNames[key] = name;
-    const trackerSubject = (appData.topicTracker?.subjects || []).find(subject => subject.id === 'tracker_' + key);
-    if (trackerSubject) trackerSubject.name = name;
+    (appData.topicTracker?.subjects || []).forEach(subject => {
+        if (subject && (subject.id === 'tracker_' + key || subject.categoryKey === key)) subject.name = name;
+    });
     (appData.studySessions || []).forEach(session => {
         if (session.subjectKey === key) session.subjectName = name;
     });
@@ -8755,6 +8765,9 @@ function renameCourseCategory(key) {
     renderCustomCourseList();
     renderKonuTab();
     renderTopicTracker();
+    renderSRTab();
+    changeWeek();
+    refreshStudySessionSubjects();
     renderStudySessions();
 }
 function getCategoryKeys(includeKriz = false) {
@@ -9395,7 +9408,7 @@ function renderKonuTab() {
             <h2 class="konu-section-toggle" onclick="toggleKonuSection('${cat}')">
                 <span class="konu-section-title"><span class="konu-caret">▶</span><span>${catIconMarkup(cat)} ${catNames[cat] || cat}</span></span>
                 <span class="konu-section-progress" title="${catPct}% tamamlandı"><span class="konu-section-progress-fill" style="width:${catPct}%;background:${catFillColor};"></span></span>
-                <span class="konu-section-meta"><button type="button" class="konu-group-edit-btn" onclick="event.preventDefault();event.stopPropagation();renameCourseCategory('${jsSafe(cat)}')">Düzenle</button><span>${catGroups.length} grup</span><span>${catDone}/${catTotal}</span><span class="konu-section-percent">${catPct}%</span></span>
+                <span class="konu-section-meta"><button type="button" class="konu-group-edit-btn konu-category-rename-btn" title="Ders adını değiştir" aria-label="${htmlSafe(catNames[cat] || cat)} ders adını değiştir" onclick="event.preventDefault();event.stopPropagation();renameCourseCategory('${jsSafe(cat)}')">Düzenle</button><span>${catGroups.length} grup</span><span>${catDone}/${catTotal}</span><span class="konu-section-percent">${catPct}%</span></span>
             </h2>
             <div class="konu-section-body">`;
 
@@ -9509,7 +9522,7 @@ function setTrackerTopicFilter(value){trackerTopicFilter=value||'';renderTopicTr
 function setTrackerStageFilter(value){trackerStageFilter=value||'';renderTopicTracker()}
 function toggleTrackerTopic(id){if(trackerOpenTopicIds.has(id))trackerOpenTopicIds.delete(id);else trackerOpenTopicIds.add(id);renderTopicTracker()}
 function addTrackerSubject(){const i=document.getElementById('trackerNewSubjectName'),name=(i?.value||'').trim();if(!name)return alert('Ders adını yazmalısın.');const id='ts_'+generateId();appData.topicTracker.subjects.push({id,exam:trackerExam,name,topics:[]});trackerSubjectId=id;if(i)i.value='';saveData();renderTopicTracker()}
-function renameTrackerSubject(){const s=getActiveTrackerSubject();if(!s)return;const n=prompt('Ders adını değiştir:',s.name||'');if(n===null||!n.trim())return;s.name=n.trim();saveData();renderTopicTracker()}
+function renameTrackerSubject(){const s=getActiveTrackerSubject();if(!s)return;const categoryKey=String(s.id||'').startsWith('tracker_')?String(s.id).slice(8):String(s.categoryKey||'');if(categoryKey&&Object.prototype.hasOwnProperty.call(catNames,categoryKey)){renameCourseCategory(categoryKey);return}const n=prompt('Ders adını değiştir:',s.name||'');if(n===null||!n.trim())return;s.name=n.trim();saveData();renderTopicTracker()}
 function deleteTrackerSubject(){const s=getActiveTrackerSubject();if(!s||!confirm(`"${s.name}" dersi ve içindeki bütün konu ilerlemeleri silinsin mi?`))return;appData.topicTracker.subjects=appData.topicTracker.subjects.filter(x=>x.id!==s.id);trackerSubjectId='';saveData();renderTopicTracker()}
 function addTrackerTopic(){const s=getActiveTrackerSubject();if(!s)return alert('Konu eklemek için önce dropdown’dan bir ders seçmelisin.');const n=prompt(`${s.name} için konu adı:`,'');if(n===null||!n.trim())return;s.topics.push({id:'tt_'+generateId(),name:n.trim(),lectures:[],sources:[]});saveData();renderTopicTracker()}
 function renameTrackerTopic(id){const s=getTrackerSubjectForTopic(id),t=s?.topics.find(x=>x.id===id);if(!t)return;const n=prompt('Konu adını değiştir:',t.name||'');if(n===null||!n.trim())return;t.name=n.trim();saveData();renderTopicTracker()}
