@@ -2475,10 +2475,10 @@
             <h3>⏱️ Derin Odak Sayacı</h3>
             <div class="timer-display" id="timerDisplay">50:00</div>
             <div class="timer-controls">
-                <button class="btn-start" onclick="startTimer(50)" id="startBtn">▶️ Başla (50')</button>
-                <button class="btn-pause" onclick="pauseTimer()" id="pauseBtn" style="display:none;">⏸️ Duraklat</button>
-                <button class="btn-start" onclick="resumeTimer()" id="resumeBtn" style="display:none;">▶️ Devam Et</button>
-                <button class="btn-stop" onclick="stopTimer()" id="stopBtn" style="display:none;">⏹️ Bitir &amp; Kaydet</button>
+                <button type="button" class="btn-start" id="startBtn">▶️ Başla (50')</button>
+                <button type="button" class="btn-pause" id="pauseBtn" style="display:none;">⏸️ Duraklat</button>
+                <button type="button" class="btn-start" id="resumeBtn" style="display:none;">▶️ Devam Et</button>
+                <button type="button" class="btn-stop" id="stopBtn" style="display:none;">⏹️ Bitir &amp; Kaydet</button>
             </div>
         </div>
 
@@ -9614,11 +9614,17 @@ function readTimerState() {
     }
 }
 function persistTimerState() {
-    if (!timerState) {
-        localStorage.removeItem(TIMER_STORAGE_KEY);
-        return;
+    try {
+        if (!timerState) {
+            localStorage.removeItem(TIMER_STORAGE_KEY);
+            return true;
+        }
+        localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(timerState));
+        return true;
+    } catch(e) {
+        console.warn('Timer durumu kalıcı olarak kaydedilemedi:', e);
+        return false;
     }
-    localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(timerState));
 }
 function getTimerRemainingSeconds() {
     if (!timerState) return 50*60;
@@ -9645,14 +9651,28 @@ function armTimerInterval() {
     if (timerState?.status !== 'running') return;
     timerInterval = setInterval(tick, 1000);
 }
+function bindTimerControls() {
+    const controls = [
+        ['startBtn', () => startTimer(50)],
+        ['pauseBtn', pauseTimer],
+        ['resumeBtn', resumeTimer],
+        ['stopBtn', stopTimer]
+    ];
+    controls.forEach(([id, handler]) => {
+        const button = document.getElementById(id);
+        if (!button || button.dataset.timerBound === '1') return;
+        button.addEventListener('click', handler);
+        button.dataset.timerBound = '1';
+    });
+}
 function startTimer(min) {
     const total = Math.max(1, Math.round(Number(min) * 60));
     timerState = { status:'running', totalSeconds:total, remainingSeconds:total, endsAt:Date.now() + total*1000, weekKey:currentWeekStr };
     timerTotalSeconds = total;
     timerRemaining = total;
-    persistTimerState();
     renderTimerState();
     armTimerInterval();
+    persistTimerState();
 }
 function pauseTimer() {
     if (timerState?.status !== 'running') return;
@@ -9724,6 +9744,7 @@ function restoreTimer() {
     renderTimerState();
     armTimerInterval();
 }
+bindTimerControls();
 document.addEventListener('visibilitychange', () => {
     if (!document.hidden && timerState?.status === 'running') tick();
 });
