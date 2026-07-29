@@ -6300,7 +6300,7 @@ function maybeMergeRemoteCatIcons(remoteData, askUser) {
     renderModalCategoryPicker();
     initKonuSourceSelectors();
     renderKonuTab();
-    renderMonthly(); renderWeekly(); renderDays(); renderSR();
+    renderMonthly(); renderWeekly(); renderDays(); renderSRTab();
     return true;
 }
 function setSheetStatus(text, cls) {
@@ -6931,7 +6931,7 @@ function changeWeek(requestedWeek, selectedDateStr) {
         autoInjectSRTasks();
         saveData();
     }
-    renderMonthly(); renderWeekly(); renderDays(); renderTodayPriority(); renderWeeklyBoard(); renderSR();
+    renderMonthly(); renderWeekly(); renderDays(); renderTodayPriority(); renderWeeklyBoard(); renderSRTab();
     updateProgress(); renderChart(); renderDashboardWeekNavigation(selectedDateStr);
 }
 function generateId() { return Math.random().toString(36).substr(2,9); }
@@ -8597,7 +8597,7 @@ function persistIconChange() {
     renderModalCategoryPicker();
     initKonuSourceSelectors();
     renderKonuTab();
-    renderMonthly(); renderWeekly(); renderDays(); renderSR();
+    renderMonthly(); renderWeekly(); renderDays(); renderSRTab();
 }
 function compressIconDataUrl(dataUrl, maxSize = 96, quality = 0.86) {
     return new Promise((resolve) => {
