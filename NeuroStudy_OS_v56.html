@@ -6093,7 +6093,9 @@ const daysOfWeek = ["Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumarte
 const energyMap   = { 'high':'🔴', 'mid':'🟡', 'low':'🟢' };
 
 let currentWeekStr = "", targetListIdForModal = "", editingTaskId = null;
+const TIMER_STORAGE_KEY = 'neurostudy_timer_state_v1';
 let timerInterval = null, timerTotalSeconds = 50*60, timerRemaining = 50*60;
+let timerState = null;
 let pushTargetTaskId = null;
 let rescueVisible = false;
 let srSessionQueue = [];
@@ -6496,6 +6498,7 @@ async function init() {
     hydratePharmacyHours();
     initKonuSourceSelectors();
     setCurrentWeek();
+    restoreTimer();
     checkEczaneTime();
     setInterval(checkEczaneTime, 60000);
 }
@@ -9597,31 +9600,133 @@ function playAlarm() {
         });
     } catch(e) {}
 }
-function startTimer(min) {
-    timerTotalSeconds = min*60; timerRemaining = timerTotalSeconds;
-    document.getElementById('startBtn').style.display  = 'none';
-    document.getElementById('pauseBtn').style.display  = 'inline-block';
-    document.getElementById('stopBtn').style.display   = 'inline-block';
+function readTimerState() {
+    try {
+        const value = JSON.parse(localStorage.getItem(TIMER_STORAGE_KEY) || 'null');
+        if (!value || !['running','paused'].includes(value.status)) return null;
+        const total = Math.max(1, Math.round(Number(value.totalSeconds) || 0));
+        const remaining = Math.max(0, Math.min(total, Math.round(Number(value.remainingSeconds) || total)));
+        const endsAt = Math.max(0, Number(value.endsAt) || 0);
+        if (value.status === 'running' && !endsAt) return null;
+        return { status:value.status, totalSeconds:total, remainingSeconds:remaining, endsAt, weekKey:value.weekKey || currentWeekStr };
+    } catch(e) {
+        return null;
+    }
+}
+function persistTimerState() {
+    if (!timerState) {
+        localStorage.removeItem(TIMER_STORAGE_KEY);
+        return;
+    }
+    localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(timerState));
+}
+function getTimerRemainingSeconds() {
+    if (!timerState) return 50*60;
+    if (timerState.status === 'running') return Math.max(0, Math.ceil((timerState.endsAt - Date.now()) / 1000));
+    return Math.max(0, timerState.remainingSeconds);
+}
+function formatTimer(seconds) {
+    const safe = Math.max(0, Math.round(Number(seconds) || 0));
+    return String(Math.floor(safe/60)).padStart(2,'0') + ':' + String(safe%60).padStart(2,'0');
+}
+function renderTimerState() {
+    timerRemaining = getTimerRemainingSeconds();
+    timerTotalSeconds = timerState?.totalSeconds || 50*60;
+    document.getElementById('timerDisplay').innerText = formatTimer(timerRemaining);
+    const status = timerState?.status || 'idle';
+    document.getElementById('startBtn').style.display = status === 'idle' ? 'inline-block' : 'none';
+    document.getElementById('pauseBtn').style.display = status === 'running' ? 'inline-block' : 'none';
+    document.getElementById('resumeBtn').style.display = status === 'paused' ? 'inline-block' : 'none';
+    document.getElementById('stopBtn').style.display = status === 'idle' ? 'none' : 'inline-block';
+}
+function armTimerInterval() {
+    clearInterval(timerInterval);
+    timerInterval = null;
+    if (timerState?.status !== 'running') return;
     timerInterval = setInterval(tick, 1000);
 }
-function pauseTimer()  { clearInterval(timerInterval); document.getElementById('pauseBtn').style.display='none'; document.getElementById('resumeBtn').style.display='inline-block'; }
-function resumeTimer() { document.getElementById('resumeBtn').style.display='none'; document.getElementById('pauseBtn').style.display='inline-block'; timerInterval=setInterval(tick,1000); }
-function stopTimer() {
+function startTimer(min) {
+    const total = Math.max(1, Math.round(Number(min) * 60));
+    timerState = { status:'running', totalSeconds:total, remainingSeconds:total, endsAt:Date.now() + total*1000, weekKey:currentWeekStr };
+    timerTotalSeconds = total;
+    timerRemaining = total;
+    persistTimerState();
+    renderTimerState();
+    armTimerInterval();
+}
+function pauseTimer() {
+    if (timerState?.status !== 'running') return;
+    timerState.remainingSeconds = getTimerRemainingSeconds();
+    timerState.status = 'paused';
+    timerState.endsAt = 0;
+    persistTimerState();
+    armTimerInterval();
+    renderTimerState();
+}
+function resumeTimer() {
+    if (timerState?.status !== 'paused') return;
+    timerState.status = 'running';
+    timerState.endsAt = Date.now() + timerState.remainingSeconds*1000;
+    persistTimerState();
+    renderTimerState();
+    armTimerInterval();
+}
+function settleTimer(completed, notify) {
+    if (!timerState) return;
+    const state = timerState;
+    const remaining = completed ? 0 : getTimerRemainingSeconds();
+    const elapsedMinutes = Math.max(0, (state.totalSeconds - remaining) / 60);
     clearInterval(timerInterval);
-    const min = (timerTotalSeconds - timerRemaining)/60;
-    if (min > 0) { ensureWeekExists(currentWeekStr); appData.weeks[currentWeekStr].focusTime += min; }
+    timerInterval = null;
+    timerState = null;
+    persistTimerState();
+    if (elapsedMinutes > 0) {
+        ensureWeekExists(state.weekKey || currentWeekStr);
+        appData.weeks[state.weekKey || currentWeekStr].focusTime += elapsedMinutes;
+        saveData();
+        renderChart();
+    }
+    timerTotalSeconds = 50*60;
     timerRemaining = 50*60;
-    document.getElementById('timerDisplay').innerText = '50:00';
-    ['startBtn'].forEach(id => document.getElementById(id).style.display='inline-block');
-    ['pauseBtn','resumeBtn','stopBtn'].forEach(id => document.getElementById(id).style.display='none');
-    saveData();
+    renderTimerState();
+    if (completed && notify) {
+        playAlarm();
+        setTimeout(()=>alert('🎉 Odaklanma tamamlandı!'),50);
+    }
+}
+function stopTimer() {
+    settleTimer(false, false);
 }
 function tick() {
-    if (timerRemaining <= 0) { stopTimer(); playAlarm(); setTimeout(()=>alert('🎉 Odaklanma tamamlandı!'),50); return; }
-    timerRemaining--;
-    document.getElementById('timerDisplay').innerText =
-        String(Math.floor(timerRemaining/60)).padStart(2,'0') + ':' + String(timerRemaining%60).padStart(2,'0');
+    if (timerState?.status !== 'running') return;
+    timerRemaining = getTimerRemainingSeconds();
+    if (timerRemaining <= 0) {
+        settleTimer(true, true);
+        return;
+    }
+    document.getElementById('timerDisplay').innerText = formatTimer(timerRemaining);
 }
+function restoreTimer() {
+    timerState = readTimerState();
+    if (!timerState) {
+        localStorage.removeItem(TIMER_STORAGE_KEY);
+        renderTimerState();
+        return;
+    }
+    timerTotalSeconds = timerState.totalSeconds;
+    timerRemaining = getTimerRemainingSeconds();
+    if (timerState.status === 'running' && timerRemaining <= 0) {
+        settleTimer(true, false);
+        return;
+    }
+    if (timerState.status === 'running') timerState.remainingSeconds = timerRemaining;
+    persistTimerState();
+    renderTimerState();
+    armTimerInterval();
+}
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && timerState?.status === 'running') tick();
+});
 
 function triggerEscapism() {
     alert("🎯 Hedef: KOSTÜ Eczacılık!\n\nKurtarma Modu'nu aç ve sadece oradaki 1 görevi bitir.\nSonra yeniden karar ver.");
