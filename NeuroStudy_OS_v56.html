@@ -3133,8 +3133,8 @@ Temel Kavramlar 01 | 1.Gün 2.Ders | 48 Günde TYT Matematik Kampı 2027,&quot;4
                     </div>
                     <div class="sheet-config-actions">
                         <button onclick="saveSheetConfigFromPanel(true)">Ayarları Kaydet</button>
-                        <button class="sync-sheet" onclick="saveSheetConfigFromPanel(true); pullFromSheet(false);">Sheet’ten Al</button>
-                        <button class="sync-export" onclick="saveSheetConfigFromPanel(false); pushToSheet(false);">Sheet’e Gönder</button>
+                        <button class="sync-sheet" onclick="syncSheetFromPanel('pull')">Sheet’ten Al</button>
+                        <button class="sync-export" onclick="syncSheetFromPanel('push')">Sheet’e Gönder</button>
                         <button class="danger" onclick="clearSheetConfigFromPanel()">Ayarları Sıfırla</button>
                     </div>
                 </div>
@@ -6237,10 +6237,15 @@ let sheetSyncTimer = null;
 let sheetSyncInFlight = false;
 
 function getSheetConfig() {
-    return {
-        url: localStorage.getItem(SHEET_CFG_URL_KEY) || '',
-        secret: localStorage.getItem(SHEET_CFG_SECRET_KEY) || ''
-    };
+    try {
+        return {
+            url: localStorage.getItem(SHEET_CFG_URL_KEY) || '',
+            secret: localStorage.getItem(SHEET_CFG_SECRET_KEY) || ''
+        };
+    } catch (error) {
+        console.error('Sheet ayarları okunamadı:', error);
+        return { url:'', secret:'' };
+    }
 }
 function hasSheetConfig() {
     const c = getSheetConfig();
@@ -6290,17 +6295,21 @@ function setSheetStatus(text, cls) {
     el.textContent = text;
     el.className = 'db-status ' + (cls || '');
 }
+function hydrateSheetConfigInputs() {
+    const cfg = getSheetConfig();
+    const urlInput = document.getElementById('sheetUrlInput');
+    const secretInput = document.getElementById('sheetSecretInput');
+    if (urlInput) urlInput.value = cfg.url;
+    if (secretInput) secretInput.value = cfg.secret;
+    return cfg;
+}
 function openSheetConfigPanel() {
     const panel = document.getElementById('sheetConfigPanel');
     const footerTools = document.querySelector('.footer-tools');
     if (footerTools) footerTools.open = true;
     if (panel) {
         panel.open = true;
-        const cfg = getSheetConfig();
-        const u = document.getElementById('sheetUrlInput');
-        const s = document.getElementById('sheetSecretInput');
-        if (u && cfg.url) u.value = cfg.url;
-        if (s && cfg.secret) s.value = cfg.secret;
+        hydrateSheetConfigInputs();
         panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 }
@@ -6312,11 +6321,26 @@ function saveSheetConfigFromPanel(showMessage) {
         setSheetStatus('☁️ URL + secret eksik', 'err');
         return false;
     }
-    localStorage.setItem(SHEET_CFG_URL_KEY, url);
-    localStorage.setItem(SHEET_CFG_SECRET_KEY, secret);
-    localStorage.removeItem(SHEET_LAST_SYNC_KEY);
-    if (showMessage) setSheetStatus('☁️ Ayarlar kaydedildi', 'ok');
-    return true;
+    try {
+        localStorage.setItem(SHEET_CFG_URL_KEY, url);
+        localStorage.setItem(SHEET_CFG_SECRET_KEY, secret);
+        localStorage.removeItem(SHEET_LAST_SYNC_KEY);
+        const saved = getSheetConfig();
+        if (saved.url !== url || saved.secret !== secret) throw new Error('Kaydedilen ayarlar geri okunamadı.');
+        hydrateSheetConfigInputs();
+        if (showMessage) setSheetStatus('☁️ Ayarlar bu cihaza kaydedildi', 'ok');
+        return true;
+    } catch (error) {
+        console.error('Sheet ayarları kaydedilemedi:', error);
+        setSheetStatus('☁️ Ayarlar bu cihazda saklanamadı', 'err');
+        alert('URL ve Secret bu cihazda kalıcı olarak saklanamadı. Tarayıcı veya Documents depolama iznini kontrol et.');
+        return false;
+    }
+}
+async function syncSheetFromPanel(direction) {
+    if (!saveSheetConfigFromPanel(false)) return;
+    if (direction === 'pull') await pullFromSheet(false);
+    else await pushToSheet(false);
 }
 function clearSheetConfigFromPanel() {
     localStorage.removeItem(SHEET_CFG_URL_KEY);
@@ -6439,9 +6463,12 @@ async function init() {
         document.getElementById('dbStatus').textContent = '⚠️ LocalStorage';
         document.getElementById('dbStatus').className = 'db-status err';
     }
-    if (hasSheetConfig()) {
+    const savedSheetConfig = hydrateSheetConfigInputs();
+    if (savedSheetConfig.url && savedSheetConfig.secret) {
         setSheetStatus('☁️ Kontrol ediliyor...', 'syncing');
         pullFromSheet(true);
+    } else {
+        setSheetStatus('☁️ Bağlantı ayarı bekleniyor', 'err');
     }
     applyCustomCategories();
     applyCustomCatIcons();
