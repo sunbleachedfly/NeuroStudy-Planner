@@ -2390,8 +2390,8 @@
     const catNames = { 'ayt_mat':'AYT Matematik', 'ilk_12':'İlk 12 Konu', 'prob':'Problemler', 'geo':'Geometri', 'fiz':'TYT Fizik', 'kriz':'Kriz Protokolü' };
 
     /* ===== ECZANE SAATLERİ (gün: [başlangıç saat, bitiş saat]) ===== */
-    const ECZANE_START = 14;  // 14:00
-    const ECZANE_END   = 18;  // 18:30 → 18
+    const ECZANE_DEFAULT_START = '14:00';
+    const ECZANE_DEFAULT_END   = '18:30'
     const ECZANE_DAYS  = [0,1,2,3,4,5,6]; // hergün (gerekirse seçilmiş günleri belirt)
     // Eczanede yapılabilecek kategoriler (düşük enerji):
     const ECZANE_SAFE_CATS = ['prob', 'ilk_12']; // TYT problem setleri
@@ -3014,6 +3014,18 @@ Temel Kavramlar 01 | 1.Gün 2.Ders | 48 Günde TYT Matematik Kampı 2027,&quot;4
                     </div>
                     <div class="tracker-progress-bg"><div class="tracker-progress-fill" style="width:68%"></div></div>
                 </div>
+            </section>
+            <section class="appearance-card">
+                <h3>🏥 Eczane çalışma saatleri</h3>
+                <div class="appearance-field">
+                    <label for="pharmacyStartTime">Başlangıç</label>
+                    <input id="pharmacyStartTime" class="form-control" type="time" value="14:00" onchange="savePharmacyHours()">
+                </div>
+                <div class="appearance-field">
+                    <label for="pharmacyEndTime">Bitiş</label>
+                    <input id="pharmacyEndTime" class="form-control" type="time" value="18:30" onchange="savePharmacyHours()">
+                </div>
+                <div class="appearance-note">Bu saatlerde yüksek enerji gerektiren görevler eczaneye uygun değil uyarısı alır.</div>
             </section>
         </div>
     </div>
@@ -6481,6 +6493,7 @@ async function init() {
     renderModalCategoryPicker();
     bindSRModeButtons();
     bindCustomCourseControls();
+    hydratePharmacyHours();
     initKonuSourceSelectors();
     setCurrentWeek();
     checkEczaneTime();
@@ -6565,15 +6578,56 @@ function renderDashboardWeekNavigation(selectedDateStr) {
    ===================================================================== */
 function checkEczaneTime() {
     const now = new Date();
-    const h = now.getHours();
-    const isEczaneTime = h >= ECZANE_START && h < ECZANE_END;
+    const isEczaneTime = isTimeWithinPharmacyHours(now);
     const banner = document.getElementById('eczaneBanner');
     if (banner) banner.classList.toggle('visible', isEczaneTime);
     return isEczaneTime;
 }
 function isEczaneSaati() {
-    const h = new Date().getHours();
-    return h >= ECZANE_START && h < ECZANE_END;
+    return isTimeWithinPharmacyHours(new Date());
+}
+function normalizePharmacyTime(value, fallback) {
+    return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value || '')) ? String(value) : fallback;
+}
+function getPharmacyHours() {
+    const settings = appData && appData.settings && typeof appData.settings === 'object' ? appData.settings : {};
+    return {
+        start: normalizePharmacyTime(settings.pharmacyStart, ECZANE_DEFAULT_START),
+        end: normalizePharmacyTime(settings.pharmacyEnd, ECZANE_DEFAULT_END)
+    };
+}
+function timeToMinutes(value) {
+    const [hours, minutes] = String(value).split(':').map(Number);
+    return hours * 60 + minutes;
+}
+function isTimeWithinPharmacyHours(date) {
+    const hours = getPharmacyHours();
+    const nowMinutes = date.getHours() * 60 + date.getMinutes();
+    const startMinutes = timeToMinutes(hours.start), endMinutes = timeToMinutes(hours.end);
+    if (startMinutes === endMinutes) return false;
+    return startMinutes < endMinutes
+        ? nowMinutes >= startMinutes && nowMinutes < endMinutes
+        : nowMinutes >= startMinutes || nowMinutes < endMinutes;
+}
+function hydratePharmacyHours() {
+    const hours = getPharmacyHours();
+    const start = document.getElementById('pharmacyStartTime'), end = document.getElementById('pharmacyEndTime');
+    if (start) start.value = hours.start;
+    if (end) end.value = hours.end;
+}
+function savePharmacyHours() {
+    const start = normalizePharmacyTime(document.getElementById('pharmacyStartTime')?.value, ECZANE_DEFAULT_START);
+    const end = normalizePharmacyTime(document.getElementById('pharmacyEndTime')?.value, ECZANE_DEFAULT_END);
+    if (start === end) {
+        alert('Eczane başlangıç ve bitiş saati aynı olamaz.');
+        hydratePharmacyHours();
+        return;
+    }
+    if (!appData.settings || typeof appData.settings !== 'object') appData.settings = {};
+    appData.settings.pharmacyStart = start;
+    appData.settings.pharmacyEnd = end;
+    saveData();
+    checkEczaneTime();
 }
 
 /* =====================================================================
@@ -6874,7 +6928,7 @@ function changeWeek(requestedWeek, selectedDateStr) {
         autoInjectSRTasks();
         saveData();
     }
-    renderMonthly(); renderWeekly(); renderDays(); renderTodayPriority(); renderWeeklyBoard();
+    renderMonthly(); renderWeekly(); renderDays(); renderTodayPriority(); renderWeeklyBoard(); renderSR();
     updateProgress(); renderChart(); renderDashboardWeekNavigation(selectedDateStr);
 }
 function generateId() { return Math.random().toString(36).substr(2,9); }
@@ -6931,11 +6985,12 @@ function createTaskHTML(task, listId) {
         imgBoxHTML    = `<div class="task-img-container" id="img-box-${task.id}"><img id="img-el-${task.id}" src=""></div>`;
     }
 
+    const checkboxId = `task-check-${canonicalTaskId(task.id).replace(/[^a-zA-Z0-9_-]/g,'_')}-${listId}`;
     return `
     <div class="task-item ${task.category} ${colClass} priority-task-${getTaskPriority(task)}" id="task-${task.id}">
         <div class="task-header">
-            <input type="checkbox" class="task-checkbox" ${task.checked?'checked':''} onchange="toggleTask('${listId}','${task.id}',this.checked)">
-            <label class="task-title"><span>${energyIcon}</span><span>${lessonIcon}</span>${htmlSafe(task.title)}</label>
+            <input id="${checkboxId}" type="checkbox" class="task-checkbox" ${task.checked?'checked':''} onchange="toggleTask('${listId}','${task.id}',this.checked)">
+            <label class="task-title" for="${checkboxId}"><span>${energyIcon}</span><span>${lessonIcon}</span>${htmlSafe(task.title)}</label>
             ${pushBtnHTML}
             ${renderTaskPriorityMenu(task,listId)}
         </div>
@@ -7194,12 +7249,15 @@ function setModalCategory(cat) {
 function openModal(listId) {
     targetListIdForModal = listId;
     editingTaskId = null;
+    document.getElementById('modalTaskName').value = '';
+    document.getElementById('modalCategory').value = 'ayt_mat';
+    document.getElementById('modalEnergy').value = 'mid';
+    document.getElementById('modalEst').value = '45';
+    document.getElementById('modalPriority').value = 'none';
     renderModalCategoryPicker();
     document.getElementById('taskModal').style.display = 'flex';
     document.getElementById('modalTitle').textContent = 'Yeni Görev Ekle';
     document.getElementById('modalSaveTaskBtn').textContent = 'Görevi Ekle';
-    document.getElementById('modalTaskName').value = '';
-    document.getElementById('modalPriority').value = 'none';
     document.getElementById('modalTaskName').focus();
 }
 function openTaskEdit(listId,taskId){const task=findTaskById(getList(listId),taskId);if(!task)return taskNotFound();targetListIdForModal=listId;editingTaskId=canonicalTaskId(task.id);document.getElementById('modalTaskName').value=task.title||'';document.getElementById('modalCategory').value=task.category||'ayt_mat';document.getElementById('modalEnergy').value=task.energy||'mid';document.getElementById('modalEst').value=Number(task.est)||45;document.getElementById('modalPriority').value=getTaskPriority(task);renderModalCategoryPicker();document.getElementById('modalTitle').textContent='Görevi Düzenle';document.getElementById('modalSaveTaskBtn').textContent='Değişiklikleri Kaydet';document.getElementById('taskModal').style.display='flex';document.getElementById('modalTaskName').focus()}
@@ -7223,7 +7281,7 @@ function saveTask() {
    ===================================================================== */
 function normalizeSRItem(item) {
     if (!item || typeof item !== 'object') return item;
-    const maxEase = Math.min(3.2, Number(SR_CONFIG.maxEase) || 3.2);
+    const maxEase = Number(SR_CONFIG.maxEase) || 3.6;
     const minEase = Number(SR_CONFIG.minEase) || 1.3;
     item.ease = Math.max(minEase, Math.min(maxEase, Number.isFinite(Number(item.ease)) ? Number(item.ease) : SR_CONFIG.startingEase));
     const reviewCount = Math.max(0, Number(item.reviewCount) || 0, Number(item.reps) || 0);
@@ -7294,7 +7352,7 @@ function scheduleSRReview(item, rating, options = {}) {
     if (!['again','hard','good','easy'].includes(rating)) throw new Error('Geçersiz SR değerlendirmesi.');
     const reviewedAt = getSRReviewDate(options.reviewedAt), reviewedAtISO = reviewedAt.toISOString();
     const previous = getSRSnapshot(item), previousState = previous.state;
-    const minEase = Number(SR_CONFIG.minEase) || 1.3, maxEase = Math.min(3.2, Number(SR_CONFIG.maxEase) || 3.2);
+    const minEase = Number(SR_CONFIG.minEase) || 1.3, maxEase = Number(SR_CONFIG.maxEase) || 3.6;
     const easeDelta = rating === 'again' ? -0.20 : rating === 'hard' ? -0.15 : rating === 'easy' ? 0.15 : 0;
     const ease = Math.max(minEase, Math.min(maxEase, Number((previous.ease + easeDelta).toFixed(2))));
     let state = previousState, interval = Math.max(1, previous.interval || 1), lapseIncrement = 0;
@@ -8163,7 +8221,7 @@ function renderSRHistory(item) {
 
 function srEaseMeterHTML(item) {
     normalizeSRItem(item);
-    const displayMax=Math.min(3.2,Number(SR_CONFIG.maxEase)||3.2),pct = Math.round(((Math.max(SR_CONFIG.minEase, Math.min(displayMax, item.ease)) - SR_CONFIG.minEase) / (displayMax - SR_CONFIG.minEase)) * 100);
+    const displayMax=Number(SR_CONFIG.maxEase)||3.6,pct = Math.round(((Math.max(SR_CONFIG.minEase, Math.min(displayMax, item.ease)) - SR_CONFIG.minEase) / (displayMax - SR_CONFIG.minEase)) * 100);
     const color = pct < 34 ? 'var(--ease-bad)' : pct < 67 ? 'var(--ease-warn)' : 'var(--ease-good)';
     return `<div class="sr-ease-meter"><span>Kolaylık</span><span class="sr-ease-track"><span class="sr-ease-fill" style="width:${pct}%;background:${color};"></span></span><span>${Number(item.ease || SR_CONFIG.startingEase).toFixed(2)}</span>${item.isLeech ? '<span class="sr-leech" title="Bu soru sık tekrarlandı. Çözüm notunu gözden geçir veya konu anlatımına geri dön.">🩸 Takıldığın soru · Çözüm notunu gözden geçir</span>' : ''}</div>`;
 }
@@ -8666,6 +8724,7 @@ function applyCustomCategories() {
         catNames[cat.key] = cat.name;
         catIcons[cat.key] = cat.icon || '📚';
         if (!defaultCatIcons[cat.key]) defaultCatIcons[cat.key] = cat.icon || '📚';
+        if (!konuSourcePresets[cat.key]) konuSourcePresets[cat.key] = [{ key:'manuel-' + cat.key, label:'Manuel / Diğer ' + cat.name }];
     });
 }
 function renameCourseCategory(key) {
