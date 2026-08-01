@@ -9789,10 +9789,17 @@ function readTimerState() {
     try {
         const value = JSON.parse(localStorage.getItem(TIMER_STORAGE_KEY) || 'null');
         if (!value || !['running','paused'].includes(value.status)) return null;
-        const total = Math.max(1, Math.round(Number(value.totalSeconds) || 0));
-        const remaining = Math.max(0, Math.min(total, Math.round(Number(value.remainingSeconds) || total)));
-        const endsAt = Math.max(0, Number(value.endsAt) || 0);
+        const totalValue = Number(value.totalSeconds);
+        if (!Number.isFinite(totalValue) || totalValue <= 0) return null;
+        const total = Math.max(1, Math.round(totalValue));
+        const remainingValue = Number(value.remainingSeconds);
+        const endsAtValue = Number(value.endsAt);
+        const endsAt = Number.isFinite(endsAtValue) ? Math.max(0, endsAtValue) : 0;
         if (value.status === 'running' && !endsAt) return null;
+        const calculatedRemaining = value.status === 'running'
+            ? Math.ceil((endsAt - Date.now()) / 1000)
+            : (Number.isFinite(remainingValue) ? remainingValue : total);
+        const remaining = Math.max(0, Math.min(total, Math.round(calculatedRemaining)));
         return { status:value.status, totalSeconds:total, remainingSeconds:remaining, endsAt, weekKey:value.weekKey || currentWeekStr };
     } catch(e) {
         return null;
@@ -9804,7 +9811,9 @@ function persistTimerState() {
             localStorage.removeItem(TIMER_STORAGE_KEY);
             return true;
         }
-        localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(timerState));
+        const snapshot = { ...timerState };
+        if (snapshot.status === 'running') snapshot.remainingSeconds = getTimerRemainingSeconds();
+        localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(snapshot));
         return true;
     } catch(e) {
         console.warn('Timer durumu kalıcı olarak kaydedilemedi:', e);
@@ -9931,8 +9940,13 @@ function restoreTimer() {
 }
 bindTimerControls();
 document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && timerState?.status === 'running') tick();
+    if (document.hidden) {
+        persistTimerState();
+    } else if (timerState?.status === 'running') {
+        tick();
+    }
 });
+window.addEventListener('pagehide', persistTimerState);
 
 function triggerEscapism() {
     alert("🎯 Hedef: KOSTÜ Eczacılık!\n\nKurtarma Modu'nu aç ve sadece oradaki 1 görevi bitir.\nSonra yeniden karar ver.");
