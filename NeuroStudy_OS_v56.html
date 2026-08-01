@@ -3183,6 +3183,30 @@ function saveImage(id, dataUrl) {
         tx.oncomplete = resolve; tx.onerror = reject;
     });
 }
+function getImageStorageStats() {
+    if (!db) return Promise.reject(new Error('IndexedDB kullanılamıyor.'));
+    return new Promise((resolve, reject) => {
+        const stats = { count:0, bytes:0, localOnlyCount:0, driveCacheCount:0 };
+        const tx = db.transaction(DB_STORE, 'readonly');
+        const req = tx.objectStore(DB_STORE).openCursor();
+        req.onsuccess = e => {
+            const cursor = e.target.result;
+            if (!cursor) return;
+            const record = cursor.value || {};
+            const id = String(record.id || '');
+            const dataUrl = typeof record.dataUrl === 'string' ? record.dataUrl : '';
+            stats.count++;
+            stats.bytes += new Blob([dataUrl]).size;
+            if (id.startsWith('drive_')) stats.driveCacheCount++;
+            else stats.localOnlyCount++;
+            cursor.continue();
+        };
+        req.onerror = () => reject(new Error('IndexedDB görselleri ölçülemedi.'));
+        tx.oncomplete = () => resolve(stats);
+        tx.onerror = () => reject(new Error('IndexedDB görselleri ölçülemedi.'));
+        tx.onabort = () => reject(new Error('IndexedDB görselleri ölçülemedi.'));
+    });
+}
 function getImage(id) {
     if (!db) return Promise.resolve(null);
     return new Promise((resolve) => {
@@ -3193,30 +3217,70 @@ function getImage(id) {
     });
 }
 function deleteImage(id) {
-    if (!db) return;
-    const tx = db.transaction(DB_STORE, 'readwrite');
-    tx.objectStore(DB_STORE).delete(id);
+    if (!db) return Promise.resolve(false);
+    return new Promise((resolve) => {
+        const tx = db.transaction(DB_STORE, 'readwrite');
+        tx.objectStore(DB_STORE).delete(id);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+        tx.onabort = () => resolve(false);
+    });
 }
 
 /* ===== GÜVENLİ KAYIT / YEDEKLEME KATMANI ===== */
-function safeSetStorage(key, value) {
+let lastStorageFailure = null;
+function classifyStorageError(error) {
+    const name = String(error?.name || '');
+    const code = Number(error?.code || 0);
+    if (name === 'QuotaExceededError' || name === 'NS_ERROR_DOM_QUOTA_REACHED' || code === 22 || code === 1014) return 'quota';
+    if (name === 'StorageVerificationError') return 'verification';
+    if (name === 'SecurityError' || name === 'InvalidAccessError') return 'access';
+    return 'unexpected';
+}
+function getStorageFailureMessage(kind) {
+    if (kind === 'quota') return 'Tarayıcı depolama alanı dolu veya yetersiz. Tam yedek alıp gereksiz kayıtları temizle.';
+    if (kind === 'access') return 'Tarayıcı kalıcı depolamaya erişemiyor. Normal tarayıcı penceresinde tekrar dene.';
+    if (kind === 'verification') return 'Yazılan veri geri doğrulanamadı. Değişiklik kalıcı olarak kaydedilmedi.';
+    return 'Beklenmeyen bir depolama hatası oluştu. Değişiklik kalıcı olarak kaydedilmedi.';
+}
+function safeSetStorage(key, value, options = {}) {
+    let previousValue = null;
     try {
+        previousValue = localStorage.getItem(key);
         localStorage.setItem(key, value);
+        if (localStorage.getItem(key) !== value) {
+            const error = new Error('Storage verification failed');
+            error.name = 'StorageVerificationError';
+            throw error;
+        }
+        lastStorageFailure = null;
         return true;
     } catch (e) {
-        console.error('localStorage yazma hatası:', e);
-        alert('⚠️ Plan verisi kaydedilemedi. Tarayıcı depolama alanı dolmuş olabilir. Lütfen Tam Yedek Al ile yedek alıp eski/verimsiz kayıtları temizle.');
+        const kind = classifyStorageError(e);
+        lastStorageFailure = { kind, message:getStorageFailureMessage(kind) };
+        try {
+            if (previousValue === null) localStorage.removeItem(key);
+            else localStorage.setItem(key, previousValue);
+        } catch (rollbackError) {
+            console.error('Kalıcı depolama geri alma hatası:', String(rollbackError?.name || 'Error'));
+        }
+        console.error('Kalıcı depolama yazma hatası:', String(e?.name || 'Error'));
+        if (!options.silent) alert('⚠️ ' + lastStorageFailure.message);
         return false;
     }
 }
 
 function getAllImages() {
-    if (!db) return Promise.resolve([]);
-    return new Promise((resolve) => {
+    if (!db) return Promise.reject(new Error('IndexedDB kullanılamıyor.'));
+    return new Promise((resolve, reject) => {
         const tx = db.transaction(DB_STORE, 'readonly');
         const req = tx.objectStore(DB_STORE).getAll();
-        req.onsuccess = e => resolve(e.target.result || []);
-        req.onerror = () => resolve([]);
+        let images = [];
+        req.onsuccess = e => { images = e.target.result || []; };
+        req.onerror = () => reject(new Error('IndexedDB görselleri okunamadı.'));
+        tx.onerror = () => reject(new Error('IndexedDB görselleri okunamadı.'));
+        tx.onabort = () => reject(new Error('IndexedDB görselleri okunamadı.'));
+        tx.oncomplete = () => resolve(images);
     });
 }
 
@@ -3321,6 +3385,10 @@ ensureTopicTrackerData();
 applyCustomCategories();
 applyCustomCatIcons();
 ensureSeededKonuGroups();
+let lastPersistedAppDataJson = (() => {
+    try { return localStorage.getItem(STORAGE_KEY) || storedPlannerData || JSON.stringify(appData); }
+    catch (error) { return storedPlannerData || JSON.stringify(appData); }
+})();
 
 function defaultKonuGroups() {
     return [
@@ -6065,7 +6133,7 @@ function defaultKonuGroups() {
 ];
 }
 
-function ensureSeededKonuGroups() {
+function ensureSeededKonuGroups(persist = true) {
     const seeded = defaultKonuGroups();
     if (!Array.isArray(appData.konuGroups)) appData.konuGroups = [];
 
@@ -6090,7 +6158,7 @@ function ensureSeededKonuGroups() {
             changed = true;
         }
     });
-    if (changed) safeSetStorage(STORAGE_KEY, JSON.stringify(appData));
+    if (changed && persist) safeSetStorage(STORAGE_KEY, JSON.stringify(appData));
 }
 
 const daysOfWeek = ["Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi","Pazar"];
@@ -6188,7 +6256,9 @@ function bindSRPasteArea(kind, elementId) {
    ===================================================================== */
 async function exportData() {
     try {
-        const images = await getAllImages();
+        let images;
+        try { images = await getAllImages(); }
+        catch (error) { throw Object.assign(new Error('Görseller okunamadığı için tam yedek oluşturulmadı.'), { code:'IMAGE_BACKUP_READ_FAILED' }); }
         const payload = {
             app: 'KOSTU_Planner',
             version: 44,
@@ -6204,8 +6274,8 @@ async function exportData() {
         a.click();
         setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     } catch(e) {
-        console.error('Yedek alınamadı:', e);
-        alert('⚠️ Yedek alınamadı. Tarayıcı izinlerini veya depolama alanını kontrol et.');
+        console.error('Yedek oluşturma hatası:', String(e?.code || e?.name || 'Error'));
+        alert(e?.code === 'IMAGE_BACKUP_READ_FAILED' ? '⚠️ Görseller okunamadığı için tam yedek oluşturulmadı.' : '⚠️ Yedek oluşturulamadı. Tarayıcı izinlerini veya depolama alanını kontrol et.');
     }
 }
 
@@ -6225,18 +6295,23 @@ function importData() {
                 appData.srPool.forEach(normalizeSRItem);
                 ensureCustomCatIconsStore();
                 applyCustomCatIcons();
-                ensureSeededKonuGroups();
-                safeSetStorage(STORAGE_KEY, JSON.stringify(appData));
-
+                ensureSeededKonuGroups(false);
                 if (Array.isArray(imported.images)) {
                     await restoreImages(imported.images);
                 }
+                const importedJson = JSON.stringify(appData);
+                if (!safeSetStorage(STORAGE_KEY, importedJson)) {
+                    restoreLastPersistedAppData();
+                    throw new Error('İçe aktarılan planner verisi kalıcı olarak kaydedilemedi.');
+                }
+                lastPersistedAppDataJson = importedJson;
 
                 alert(`🎉 Yedek yüklendi!${Array.isArray(imported.images) ? ' Görseller de geri yüklendi.' : ''} Sayfa yenileniyor.`);
                 location.reload();
             } catch(e) {
-                console.error('Yedek yükleme hatası:', e);
-                alert('Geçersiz ya da bozuk yedek dosyası.');
+                restoreLastPersistedAppData();
+                console.error('Yedek yükleme hatası:', String(e?.name || 'Error'));
+                alert(e?.message === 'İçe aktarılan planner verisi kalıcı olarak kaydedilemedi.' ? 'Yedek verisi kalıcı olarak kaydedilemedi; mevcut planner verisi korundu.' : 'Geçersiz, bozuk veya okunamayan yedek dosyası. Mevcut planner verisi değiştirilmedi.');
             }
         };
         reader.readAsText(e.target.files[0]);
@@ -6299,7 +6374,13 @@ function maybeMergeRemoteCatIcons(remoteData, askUser) {
     appData.customCatIcons = { ...appData.customCatIcons, ...remoteData.customCatIcons };
     appData.catIconSyncUpdatedAt = Math.max(Number(appData.catIconSyncUpdatedAt || 0), Number(remoteData.catIconSyncUpdatedAt || 0), Date.now());
     applyCustomCatIcons();
-    safeSetStorage(STORAGE_KEY, JSON.stringify(appData));
+    const mergedJson = JSON.stringify(appData);
+    if (!safeSetStorage(STORAGE_KEY, mergedJson)) {
+        restoreLastPersistedAppData();
+        renderAfterStorageRollback();
+        return false;
+    }
+    lastPersistedAppDataJson = mergedJson;
     renderCategoryIconSettings();
     renderModalCategoryPicker();
     initKonuSourceSelectors();
@@ -6431,8 +6512,15 @@ async function pullFromSheet(showPrompt) {
                 if (!Array.isArray(appData.konuGroups)) appData.konuGroups = [];
                 ensureCustomCatIconsStore();
                 applyCustomCatIcons();
-                ensureSeededKonuGroups();
-                safeSetStorage(STORAGE_KEY, JSON.stringify(appData));
+                ensureSeededKonuGroups(false);
+                const remoteJson = JSON.stringify(appData);
+                if (!safeSetStorage(STORAGE_KEY, remoteJson)) {
+                    restoreLastPersistedAppData();
+                    renderAfterStorageRollback();
+                    setSheetStatus('☁️ Yerel kayıt başarısız; mevcut veri korundu', 'err');
+                    return;
+                }
+                lastPersistedAppDataJson = remoteJson;
                 localStorage.setItem(SHEET_LAST_SYNC_KEY, String(remoteUpdatedAt));
                 setSheetStatus('☁️ Senkron: ' + new Date(remoteUpdatedAt).toLocaleTimeString('tr-TR'), 'ok');
                 location.reload();
@@ -6633,7 +6721,7 @@ function savePharmacyHours() {
     if (!appData.settings || typeof appData.settings !== 'object') appData.settings = {};
     appData.settings.pharmacyStart = start;
     appData.settings.pharmacyEnd = end;
-    saveData();
+    if (!saveData()) { hydratePharmacyHours(); return; }
     checkEczaneTime();
 }
 
@@ -6719,14 +6807,39 @@ function updateStudySessionActivityFields(preserveValues=false){const activity=d
 function resetStudySessionForm(){const ids=['studySessionEditId','studySessionStartTime','studySessionDuration','studySessionPlanned','studySessionTopic','studySessionSource','studySessionTestNumber','studySessionCorrect','studySessionWrong','studySessionBlank','studySessionErrorTypes','studySessionNotes'];ids.forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});['studySessionDifficulty','studySessionEnergy','studySessionFocus','studySessionEnvironment','studySessionInterruptions'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});const date=document.getElementById('studySessionDate'),activity=document.getElementById('studySessionActivity'),activitySection=document.getElementById('studySessionActivitySection'),conditions=document.getElementById('studySessionConditions');if(date)date.value=getTodayStr();if(activity)activity.value='lecture';if(activitySection)activitySection.open=false;if(conditions)conditions.open=false;const title=document.getElementById('studySessionFormTitle'),cancel=document.getElementById('studySessionCancelEdit'),badge=document.getElementById('studySessionEditBadge'),saveButton=document.getElementById('studySessionSaveButton'),clearButton=document.getElementById('studySessionClearButton');if(title)title.textContent='Yeni çalışma kaydı';if(cancel)cancel.style.display='none';if(badge)badge.style.display='none';if(saveButton)saveButton.textContent='Çalışmayı Kaydet';if(clearButton)clearButton.style.display='inline-block';updateStudySessionActivityFields();setStudySessionStatus('')}
 function readStudySessionForm(){const value=id=>document.getElementById(id)?.value??'',subjectKey=value('studySessionSubject'),subjectName=catNames[subjectKey]||getStudySessionSubjectCatalog().find(x=>x.key===subjectKey)?.name||subjectKey,activityType=value('studySessionActivity'),hasTestFields=['test','mock-exam','error-analysis'].includes(activityType),correct=hasTestFields?Number(value('studySessionCorrect')||0):0,wrong=hasTestFields?Number(value('studySessionWrong')||0):0,blank=hasTestFields?Number(value('studySessionBlank')||0):0;return{id:value('studySessionEditId'),date:value('studySessionDate'),startTime:value('studySessionStartTime'),durationMinutes:Number(value('studySessionDuration')),plannedMinutes:Number(value('studySessionPlanned')||0),subjectKey,subjectName,topicId:'',topicName:value('studySessionTopic'),activityType,sourceId:'',sourceName:value('studySessionSource'),testNumber:hasTestFields?value('studySessionTestNumber'):'',correct,wrong,blank,difficulty:hasTestFields?value('studySessionDifficulty'):'',energyLevel:value('studySessionEnergy'),focusLevel:value('studySessionFocus'),environment:value('studySessionEnvironment'),interruptionLevel:value('studySessionInterruptions'),errorTypes:value('studySessionErrorTypes').split(',').map(x=>x.trim()).filter(Boolean),notes:value('studySessionNotes'),linkedTaskId:'',linkedTrackerSourceId:'',captureMode:'manual',timerRunId:null}}
 function validateStudySessionDraft(draft){if(!parseDashboardDate(draft.date))return'Geçerli bir tarih seçmelisin.';if(!Number.isFinite(draft.durationMinutes)||draft.durationMinutes<=0||draft.durationMinutes>1440)return'Gerçekleşen süre 1–1440 dakika arasında olmalı.';if(!Number.isFinite(draft.plannedMinutes)||draft.plannedMinutes<0||draft.plannedMinutes>1440)return'Planlanan süre 0–1440 dakika arasında olmalı.';if(!draft.subjectKey)return'Ders seçmelisin.';if(!STUDY_SESSION_ACTIVITIES.includes(draft.activityType))return'Geçerli bir aktivite seçmelisin.';if([draft.correct,draft.wrong,draft.blank].some(x=>!Number.isFinite(x)||x<0||!Number.isInteger(x)))return'Doğru, yanlış ve boş değerleri negatif olmayan tam sayı olmalı.';return''}
-function getStudyStorageUsage(){const appJson=JSON.stringify(appData),sessionsJson=JSON.stringify(appData.studySessions||[]),appBytes=new Blob([appJson]).size,sessionBytes=new Blob([sessionsJson]).size;return{appBytes,sessionBytes,count:(appData.studySessions||[]).length}}
-function saveStudySession(){const draft=readStudySessionForm(),error=validateStudySessionDraft(draft);if(error)return setStudySessionStatus(error,true);if(draft.date>getTodayStr()&&!confirm('Seçilen tarih gelecekte. Bu kayıt saklanacak ancak gerçekleşmiş çalışma analizlerine katılmayacak. Yine de kaydetmek istiyor musun?'))return;const existing=(appData.studySessions||[]).find(x=>x.id===draft.id),existingIndex=existing?appData.studySessions.indexOf(existing):-1,previous=existing?{...existing,errorTypes:[...(existing.errorTypes||[])]}:null,now=new Date().toISOString(),session=normalizeStudySession({...draft,id:existing?.id||'ss_'+Date.now().toString(36)+'_'+generateId(),createdAt:existing?.createdAt||now,updatedAt:now});if(existing)appData.studySessions[existingIndex]=session;else appData.studySessions.push(session);if(!saveData()){if(existing)appData.studySessions[existingIndex]=previous;else appData.studySessions.pop();const message='Kayıt kalıcı olarak saklanmadı. Tarayıcı depolama kotası dolmuş olabilir. Tam yedek al; eski kayıtlarını silmeden önce mutlaka dışa aktar.';setStudySessionStatus(message,true);alert(message);renderStudyStorageUsage();return}resetStudySessionForm();refreshStudySessionSubjects();renderStudySessions();setStudySessionStatus(existing?'Kayıt güncellendi.':'Çalışma kaydı eklendi.')}
+function getStudyStorageUsage(){
+    const appJson=JSON.stringify(appData),sessionsJson=JSON.stringify(appData.studySessions||[]);
+    let storedPlannerBytes=null;
+    try{const stored=localStorage.getItem(STORAGE_KEY);storedPlannerBytes=stored===null?0:new Blob([stored]).size}catch(error){}
+    return{appBytes:new Blob([appJson]).size,storedPlannerBytes,sessionBytes:new Blob([sessionsJson]).size,count:(appData.studySessions||[]).length}
+}
+function saveStudySession(){const draft=readStudySessionForm(),error=validateStudySessionDraft(draft);if(error)return setStudySessionStatus(error,true);if(draft.date>getTodayStr()&&!confirm('Seçilen tarih gelecekte. Bu kayıt saklanacak ancak gerçekleşmiş çalışma analizlerine katılmayacak. Yine de kaydetmek istiyor musun?'))return;const existing=(appData.studySessions||[]).find(x=>x.id===draft.id),existingIndex=existing?appData.studySessions.indexOf(existing):-1,now=new Date().toISOString(),session=normalizeStudySession({...draft,id:existing?.id||'ss_'+Date.now().toString(36)+'_'+generateId(),createdAt:existing?.createdAt||now,updatedAt:now});if(existing)appData.studySessions[existingIndex]=session;else appData.studySessions.push(session);if(!saveData()){setStudySessionStatus(lastStorageFailure?.message||'Kayıt kalıcı olarak saklanmadı.',true);renderStudyStorageUsage();return}resetStudySessionForm();refreshStudySessionSubjects();renderStudySessions();setStudySessionStatus(existing?'Kayıt güncellendi.':'Çalışma kaydı eklendi.')}
 function editStudySession(id){const session=(appData.studySessions||[]).find(x=>x.id===id);if(!session)return;refreshStudySessionSubjects();const set=(field,value)=>{const el=document.getElementById(field);if(el)el.value=value??''};set('studySessionEditId',session.id);set('studySessionDate',session.date);set('studySessionStartTime',session.startTime);set('studySessionDuration',session.durationMinutes);set('studySessionPlanned',session.plannedMinutes);set('studySessionSubject',session.subjectKey);set('studySessionActivity',session.activityType);set('studySessionTopic',session.topicName);set('studySessionSource',session.sourceName);set('studySessionTestNumber',session.testNumber);set('studySessionDifficulty',session.difficulty);set('studySessionCorrect',session.correct);set('studySessionWrong',session.wrong);set('studySessionBlank',session.blank);set('studySessionEnergy',session.energyLevel);set('studySessionFocus',session.focusLevel);set('studySessionEnvironment',session.environment);set('studySessionInterruptions',session.interruptionLevel);set('studySessionErrorTypes',(session.errorTypes||[]).join(', '));set('studySessionNotes',session.notes);updateStudySessionActivityFields(true);document.getElementById('studySessionFormTitle').textContent='Çalışma kaydını düzenle';document.getElementById('studySessionEditBadge').style.display='inline-flex';document.getElementById('studySessionCancelEdit').style.display='inline-block';document.getElementById('studySessionClearButton').style.display='none';document.getElementById('studySessionSaveButton').textContent='Değişiklikleri Kaydet';setStudySessionStatus('');document.getElementById('tab-study-log').scrollIntoView({behavior:'smooth',block:'start'})}
-function deleteStudySession(id){const session=(appData.studySessions||[]).find(x=>x.id===id);if(!session||!confirm(`${session.date} tarihli çalışma kaydı silinsin mi?`))return;appData.studySessions=appData.studySessions.filter(x=>x.id!==id);if(document.getElementById('studySessionEditId')?.value===id)resetStudySessionForm();saveData();refreshStudySessionSubjects();renderStudySessions()}
+function deleteStudySession(id){const session=(appData.studySessions||[]).find(x=>x.id===id);if(!session||!confirm(`${session.date} tarihli çalışma kaydı silinsin mi?`))return;appData.studySessions=appData.studySessions.filter(x=>x.id!==id);if(!saveData())return;if(document.getElementById('studySessionEditId')?.value===id)resetStudySessionForm();refreshStudySessionSubjects();renderStudySessions()}
 function formatStudySessionMinutes(value){const minutes=Math.round(Number(value)||0),hours=Math.floor(minutes/60),rest=minutes%60;return hours?`${hours} sa ${rest?rest+' dk':''}`.trim():`${rest} dk`}
 function formatStudyStorageBytes(bytes){if(bytes<1024)return`${bytes} B`;if(bytes<1024*1024)return`${Math.round(bytes/1024)} KB`;return`${(bytes/1024/1024).toFixed(2)} MB`}
 async function requestStudyPersistentStorage(){if(!navigator.storage?.persist)return alert('Bu tarayıcı kalıcı depolama isteğini desteklemiyor. Normal depolama çalışmaya devam eder; yalnızca otomatik temizlemeye karşı ek koruma garantisi yoktur.');try{const granted=await navigator.storage.persist();await renderStudyStorageUsage();const localFileNote=location.protocol==='file:'?' Yerel HTML dosyalarında bu izin tarayıcıya göre kullanılamayabilir.':'';alert(granted?'Kalıcı depolama izni verildi. Bu izin yedek yerine geçmez; düzenli tam yedek almaya devam et.':`Tarayıcı kalıcı depolama garantisi vermedi. Verileriniz normal şekilde saklanmaya devam eder; ancak düzenli tam yedek almanız önerilir. Normal depolama çalışıyor; yalnızca tarayıcının otomatik temizlemeye karşı ek koruma garantisi verilmedi.${localFileNote}`)}catch(error){console.error('Kalıcı depolama isteği başarısız:',error);const localFileNote=location.protocol==='file:'?' Yerel HTML dosyalarında bu izin tarayıcıya göre kullanılamayabilir.':'';alert(`Kalıcı depolama isteği tamamlanamadı. Normal depolama çalışmaya devam eder; yalnızca otomatik temizlemeye karşı ek koruma garantisi yoktur. Düzenli tam yedek almanız önerilir.${localFileNote}`)}}
-async function renderStudyStorageUsage(){const el=document.getElementById('studySessionStorageUsage');if(!el)return;const usage=getStudyStorageUsage(),level=usage.appBytes>=4*1024*1024?'warning':usage.appBytes>=3*1024*1024?'info':'normal',advice=usage.appBytes>=4*1024*1024?'Tam yedek önerilir':usage.appBytes>=3*1024*1024?'Veri boyutu büyüyor':'Normal',storageSupported=!!navigator.storage;el.className='study-log-storage '+level;el.innerHTML=`<div class="study-log-storage-metrics"><div class="study-log-storage-metric"><span>Planner verisi</span><strong>${formatStudyStorageBytes(usage.appBytes)}</strong><small>${advice}</small></div><div class="study-log-storage-metric"><span>Çalışma Günlüğü</span><strong>${formatStudyStorageBytes(usage.sessionBytes)}</strong><small>${usage.count} seans</small></div><div class="study-log-storage-metric"><span>Tarayıcı toplam kullanımı</span><strong id="studyBrowserStorageEstimate">${storageSupported?'Hesaplanıyor…':'Desteklenmiyor'}</strong><small id="studyStoragePersistence">${storageSupported?'Kalıcılık kontrol ediliyor…':'Kalıcılık desteklenmiyor'}</small></div></div><div class="study-log-storage-actions">${navigator.storage?.persist?'<button type="button" class="studio-secondary" onclick="requestStudyPersistentStorage()">Kalıcı depolama iste</button>':''}</div><span class="study-log-storage-note">Boyutlar yaklaşık değerlerdir; tarayıcı kotası cihaza göre değişebilir. Kalıcı depolama tam yedek yerine geçmez.</span>`;if(!storageSupported)return;try{const [estimate,persisted]=await Promise.all([navigator.storage.estimate?.(),navigator.storage.persisted?.()]),estimateEl=document.getElementById('studyBrowserStorageEstimate'),persistedEl=document.getElementById('studyStoragePersistence');if(estimateEl&&estimate)estimateEl.textContent=`${formatStudyStorageBytes(estimate.usage||0)} / ${formatStudyStorageBytes(estimate.quota||0)}`;else if(estimateEl)estimateEl.textContent='Tahmin kullanılamıyor';if(persistedEl){persistedEl.textContent=persisted===true?'Kalıcı depolama etkin':'Garanti verilmedi';persistedEl.classList.toggle('study-log-persistence-pending',persisted!==true)}}catch(error){console.warn('Tarayıcı depolama tahmini alınamadı:',error);const estimateEl=document.getElementById('studyBrowserStorageEstimate'),persistedEl=document.getElementById('studyStoragePersistence');if(estimateEl)estimateEl.textContent='Tahmin alınamadı';if(persistedEl){persistedEl.textContent='Garanti verilmedi';persistedEl.classList.add('study-log-persistence-pending')}}}
+async function renderStudyStorageUsage(){
+    const el=document.getElementById('studySessionStorageUsage');if(!el)return;
+    let usage;
+    try{usage=getStudyStorageUsage()}catch(error){el.className='study-log-storage warning';el.textContent='Storage kullanımı ölçülemedi.';return}
+    const storageSupported=!!navigator.storage,appLevel=usage.appBytes>=4*1024*1024?'critical':usage.appBytes>=3*1024*1024?'warning':'normal';
+    el.className='study-log-storage '+appLevel;
+    el.innerHTML=`<div class="study-log-storage-metrics"><div class="study-log-storage-metric"><span>appData</span><strong>${formatStudyStorageBytes(usage.appBytes)}</strong><small>Bellekteki planner JSON’u</small></div><div class="study-log-storage-metric"><span>localStorage planner</span><strong>${usage.storedPlannerBytes===null?'Ölçülemedi':formatStudyStorageBytes(usage.storedPlannerBytes)}</strong><small>Kalıcı ana planner kaydı</small></div><div class="study-log-storage-metric"><span>IndexedDB görselleri</span><strong id="studyImageStorageEstimate">Hesaplanıyor…</strong><small id="studyImageStorageBreakdown">Yerel ve Drive cache ayrılıyor…</small></div><div class="study-log-storage-metric"><span>Çalışma Günlüğü</span><strong>${formatStudyStorageBytes(usage.sessionBytes)}</strong><small>${usage.count} seans</small></div><div class="study-log-storage-metric"><span>Tarayıcı toplam kullanımı</span><strong id="studyBrowserStorageEstimate">${storageSupported?'Hesaplanıyor…':'Desteklenmiyor'}</strong><small id="studyStorageRatio">Kullanım durumu hesaplanıyor…</small></div><div class="study-log-storage-metric"><span>Kalıcılık</span><strong id="studyStoragePersistence">${storageSupported?'Kontrol ediliyor…':'Desteklenmiyor'}</strong><small>Kalıcı depolama yedek yerine geçmez</small></div></div><div class="study-log-storage-actions">${navigator.storage?.persist?'<button type="button" class="studio-secondary" onclick="requestStudyPersistentStorage()">Kalıcı depolama iste</button>':''}</div><span class="study-log-storage-note">Boyutlar yaklaşık değerlerdir; tarayıcı kotası cihaza göre değişebilir. Görsel içeriği ve bağlantı bilgileri bu panelde gösterilmez.</span>`;
+    try{
+        const stats=await getImageStorageStats(),imageEl=document.getElementById('studyImageStorageEstimate'),breakdownEl=document.getElementById('studyImageStorageBreakdown');
+        if(imageEl)imageEl.textContent=`${stats.count} kayıt · ${formatStudyStorageBytes(stats.bytes)}`;
+        if(breakdownEl)breakdownEl.textContent=`${stats.localOnlyCount} local-only · ${stats.driveCacheCount} Drive cache`;
+    }catch(error){const imageEl=document.getElementById('studyImageStorageEstimate'),breakdownEl=document.getElementById('studyImageStorageBreakdown');if(imageEl)imageEl.textContent='Ölçülemedi';if(breakdownEl)breakdownEl.textContent='IndexedDB görsellerine erişilemedi'}
+    if(!storageSupported)return;
+    try{
+        const [estimate,persisted]=await Promise.all([navigator.storage.estimate?.(),navigator.storage.persisted?.()]),estimateEl=document.getElementById('studyBrowserStorageEstimate'),ratioEl=document.getElementById('studyStorageRatio'),persistedEl=document.getElementById('studyStoragePersistence'),ratio=estimate?.quota?Number(estimate.usage||0)/Number(estimate.quota):0,browserLevel=ratio>=.85?'critical':ratio>=.6?'warning':'normal',level=appLevel==='critical'||browserLevel==='critical'?'critical':appLevel==='warning'||browserLevel==='warning'?'warning':'normal';
+        el.className='study-log-storage '+level;
+        if(estimateEl&&estimate)estimateEl.textContent=`${formatStudyStorageBytes(estimate.usage||0)} / ${formatStudyStorageBytes(estimate.quota||0)}`;else if(estimateEl)estimateEl.textContent='Ölçülemedi';
+        if(ratioEl)ratioEl.textContent=level==='critical'?'Kritik':level==='warning'?'Dikkat':'Normal';
+        if(persistedEl){persistedEl.textContent=persisted===true?'Etkin':'Garanti verilmedi';persistedEl.classList.toggle('study-log-persistence-pending',persisted!==true)}
+    }catch(error){const estimateEl=document.getElementById('studyBrowserStorageEstimate'),ratioEl=document.getElementById('studyStorageRatio'),persistedEl=document.getElementById('studyStoragePersistence');if(estimateEl)estimateEl.textContent='Ölçülemedi';if(ratioEl)ratioEl.textContent='Durum ölçülemedi';if(persistedEl){persistedEl.textContent='Garanti verilmedi';persistedEl.classList.add('study-log-persistence-pending')}}
+}
 
 /* =====================================================================
    KÜMÜLATİF AI RAPORU — SALT OKUNUR ANALİZ
@@ -6916,11 +7029,52 @@ function ensureWeekExists(weekStr) {
         daysOfWeek.forEach(d => appData.weeks[weekStr].days[d] = []);
     }
 }
+function restoreLastPersistedAppData() {
+    try {
+        const restored = JSON.parse(lastPersistedAppDataJson);
+        appData = normalizeAppData(restored);
+        if (!Array.isArray(appData.monthly)) appData.monthly = [];
+        if (!appData.weeks || typeof appData.weeks !== 'object') appData.weeks = {};
+        if (!Array.isArray(appData.srPool)) appData.srPool = [];
+        appData.srPool.forEach(normalizeSRItem);
+        if (!Array.isArray(appData.konuGroups)) appData.konuGroups = [];
+        if (!appData.konuOpenCats) appData.konuOpenCats = {};
+        if (!appData.customCatIcons) appData.customCatIcons = {};
+        if (!Array.isArray(appData.customCategories)) appData.customCategories = [];
+        ensureTopicTrackerData();
+        applyCustomCategories();
+        applyCustomCatIcons();
+        return true;
+    } catch (error) {
+        console.error('Son doğrulanmış planner verisi geri yüklenemedi:', String(error?.name || 'Error'));
+        return false;
+    }
+}
+function renderAfterStorageRollback() {
+    const renderers = [renderMonthly, renderWeekly, renderDays, renderTodayPriority, renderWeeklyBoard, renderSRTab, renderKonuTab, renderTopicTracker, renderStudySessions, renderCategoryIconSettings];
+    renderers.forEach(render => { try { render(); } catch (error) { console.warn('Rollback görünümü yenilenemedi:', render.name); } });
+    try { refreshStudySessionSubjects(); renderStudyStorageUsage(); } catch (error) {}
+}
 function saveData() {
-    const stored = safeSetStorage(STORAGE_KEY, JSON.stringify(appData));
+    let serialized;
+    try { serialized = JSON.stringify(appData); }
+    catch (error) {
+        lastStorageFailure = { kind:'unexpected', message:'Planner verisi hazırlanamadı. Değişiklik kalıcı olarak kaydedilmedi.' };
+        alert('⚠️ ' + lastStorageFailure.message);
+        restoreLastPersistedAppData();
+        renderAfterStorageRollback();
+        return false;
+    }
+    const stored = safeSetStorage(STORAGE_KEY, serialized);
+    if (!stored) {
+        restoreLastPersistedAppData();
+        renderAfterStorageRollback();
+        return false;
+    }
+    lastPersistedAppDataJson = serialized;
     updateProgress(); renderChart();
-    if (stored) scheduleSheetPush();
-    return stored;
+    scheduleSheetPush();
+    return true;
 }
 function changeWeek(requestedWeek, selectedDateStr) {
     requestedWeek = requestedWeek || document.getElementById('weekSelector').value;
@@ -6959,15 +7113,15 @@ function sortTasksForDisplay(tasks){return(tasks||[]).map((task,index)=>({task,i
 function isDailyTaskList(listId){return daysOfWeek.includes(listId)}
 function confirmDuplicateMust(listId,taskId){if(!isDailyTaskList(listId))return true;const duplicate=getList(listId).some(task=>!taskIdMatches(task,taskId)&&!task.checked&&getTaskPriority(task)==='must');return!duplicate||confirm("Bu gün için zaten bir ‘Bugün mutlaka’ görevi var. Yeni görevi de aynı öncelikle kaydetmek istiyor musun?")}
 function renderTaskPriorityMenu(task,listId){const priority=getTaskPriority(task),label=TASK_PRIORITY_LABELS[priority],summary=priority==='none'?'☆':label;return`<details class="task-priority-menu" onclick="event.stopPropagation()"><summary class="priority-${priority}" title="Görev önceliğini değiştir" aria-label="Öncelik: ${htmlSafe(label)}">${summary}</summary><div class="task-priority-menu-panel">${['must','important','none','optional'].map(value=>`<button type="button" class="priority-${value}" onclick="updateTaskPriority('${listId}','${task.id}','${value}')">${TASK_PRIORITY_LABELS[value]}</button>`).join('')}</div></details>`}
-function updateTaskPriority(listId,taskId,priority){if(!Object.prototype.hasOwnProperty.call(TASK_PRIORITY_LABELS,priority))return;const list=getList(listId),task=findTaskById(list,taskId);if(!task)return taskNotFound();if(priority==='must'&&!confirmDuplicateMust(listId,taskId))return;task.priority=priority;saveData();changeWeek()}
+function updateTaskPriority(listId,taskId,priority){if(!Object.prototype.hasOwnProperty.call(TASK_PRIORITY_LABELS,priority))return;const list=getList(listId),task=findTaskById(list,taskId);if(!task)return taskNotFound();if(priority==='must'&&!confirmDuplicateMust(listId,taskId))return;task.priority=priority;if(!saveData())return;changeWeek()}
 function getTodayTaskContext(){const now=new Date(),weekKey=getWeekKeyForDate(now),day=daysOfWeek[(now.getDay()+6)%7];ensureWeekExists(weekKey);return{weekKey,day,tasks:appData.weeks[weekKey].days[day]||[]}}
 function getTodayPriorityTasks(){return sortTasksForDisplay(getTodayTaskContext().tasks.filter(task=>!task.checked&&getTaskPriority(task)==='must'))}
 function renderTodayPriority(){const el=document.getElementById('todayPriorityCard');if(!el)return;const tasks=getTodayPriorityTasks();if(!tasks.length){el.innerHTML='<div class="today-priority-card-head"><h3>🎯 Bugünün tek önceliği</h3></div><div class="today-priority-empty"><span>Bugün için “Bugün mutlaka” görevi seçilmedi.</span><button type="button" onclick="focusTodayTasks()">Görevlerden seç</button></div>';return}const first=tasks[0],context=[catNames[first.category]||first.category,first.topicName,first.sourceName].filter(Boolean).map(htmlSafe).join(' · ');el.innerHTML=`<div class="today-priority-card-head"><h3>🎯 Bugünün tek önceliği</h3><span class="priority-must">Bugün mutlaka</span></div><div class="today-priority-main"><div class="today-priority-copy"><strong>${htmlSafe(first.title)}</strong><span>${context}${context?' · ':''}${Number(first.est)||0} dk</span></div><button type="button" onclick="completeTodayPriority('${first.id}')">Tamamla</button></div>${tasks.length>1?`<div class="today-priority-warning">Bugün için ${tasks.length} aktif “Bugün mutlaka” görevi var.</div><ul class="today-priority-more">${tasks.slice(1).map(task=>`<li>${htmlSafe(task.title)} · ${Number(task.est)||0} dk</li>`).join('')}</ul>`:''}`}
-function completeTodayPriority(taskId){const context=getTodayTaskContext(),task=findTaskById(context.tasks,taskId);if(!task)return taskNotFound();if(context.weekKey===currentWeekStr){toggleTask(context.day,taskId,true);return}task.checked=true;if(task.isSR&&task.srId){const srItem=appData.srPool.find(item=>item.id===task.srId);if(srItem){applySRReview(srItem,'good');cleanupPendingSRTasks(task.srId,task.id)}}saveData();changeWeek()}
+function completeTodayPriority(taskId){const context=getTodayTaskContext(),task=findTaskById(context.tasks,taskId);if(!task)return taskNotFound();if(context.weekKey===currentWeekStr){toggleTask(context.day,taskId,true);return}task.checked=true;if(task.isSR&&task.srId){const srItem=appData.srPool.find(item=>item.id===task.srId);if(srItem){applySRReview(srItem,'good');cleanupPendingSRTasks(task.srId,task.id)}}if(!saveData())return;changeWeek()}
 function focusTodayTaskColumn(){goToCurrentDashboardWeek();requestAnimationFrame(()=>{const context=getTodayTaskContext(),list=document.getElementById('list-'+context.day),column=list?.closest('.day-column');if(column){column.scrollIntoView({behavior:'smooth',block:'center',inline:'center'});column.animate([{boxShadow:'0 0 0 0 rgba(184,50,104,0)'},{boxShadow:'0 0 0 4px rgba(184,50,104,.32)'},{boxShadow:'0 0 0 0 rgba(184,50,104,0)'}],{duration:1100});column.querySelector('.add-task-btn')?.focus()}})}
 function focusTodayTasks(){const modal=document.getElementById('todayTaskPickerModal'),list=document.getElementById('todayTaskPickerList'),context=getTodayTaskContext(),tasks=sortTasksForDisplay(context.tasks.filter(task=>!task.checked));if(!modal||!list)return;list.innerHTML=tasks.length?tasks.map(task=>`<div class="today-task-picker-item"><span><strong>${htmlSafe(task.title)}</strong><small>${htmlSafe(catNames[task.category]||task.category||'Ders')} · ${Number(task.est)||0} dk</small></span><button type="button" onclick="chooseTodayPriorityTask('${task.id}')">Seç</button></div>`).join(''):'<div class="study-log-empty">Bugün için seçilebilecek tamamlanmamış görev yok.<br><button type="button" style="margin-top:9px" onclick="closeTodayTaskPicker();focusTodayTaskColumn()">Bugünün görevlerine git</button></div>';modal.style.display='flex'}
 function closeTodayTaskPicker(){document.getElementById('todayTaskPickerModal').style.display='none'}
-function chooseTodayPriorityTask(taskId){const context=getTodayTaskContext(),task=findTaskById(context.tasks,taskId);if(!task)return taskNotFound();if(!confirmDuplicateMust(context.day,taskId))return;task.priority='must';saveData();closeTodayTaskPicker();changeWeek()}
+function chooseTodayPriorityTask(taskId){const context=getTodayTaskContext(),task=findTaskById(context.tasks,taskId);if(!task)return taskNotFound();if(!confirmDuplicateMust(context.day,taskId))return;task.priority='must';if(!saveData())return;closeTodayTaskPicker();changeWeek()}
 
 /* =====================================================================
    TASK HTML
@@ -7187,7 +7341,8 @@ function confirmPush(day) {
     if(getTaskPriority(task)==='must'&&!confirmDuplicateMust(day,null))return;
     task.id = generateId(); // yeni id ile kopyala (orijinal havuzda kalsın)
     weekData.days[day].push(task);
-    saveData(); changeWeek();
+    if (!saveData()) return;
+    changeWeek();
     closePushModal();
 }
 
@@ -7212,24 +7367,27 @@ function toggleTask(listId, taskId, isChecked) {
             cleanupPendingSRTasks(task.srId, task.id);
         }
     }
-    saveData(); changeWeek();
+    if (!saveData()) return;
+    changeWeek();
 }
 function updateActual(listId, taskId, value) {
     const list = getList(listId);
     const task = findTaskById(list,taskId);
     if (!task) return taskNotFound();
-    task.act = parseInt(value)||0; saveData();
+    task.act = parseInt(value)||0;
+    saveData();
 }
-function deleteTask(listId, taskId) {
+async function deleteTask(listId, taskId) {
     const list = getList(listId);
     const idx = findTaskIndexById(list,taskId);
     if (idx === -1) return taskNotFound();
     if (!confirm('Silinsin mi?')) return;
     if (idx > -1) {
         const task = list[idx];
-        if (task.imgId && !task.isSR) deleteImage(task.imgId);
         list.splice(idx, 1);
-        saveData(); changeWeek();
+        if (!saveData()) return;
+        changeWeek();
+        if (task.imgId && !task.isSR && !(await deleteImage(task.imgId))) alert('Görev silindi; ancak bağlı yerel görsel temizlenemedi.');
     }
 }
 
@@ -7280,7 +7438,8 @@ function saveTask() {
     if(priority==='must'&&!confirmDuplicateMust(targetListIdForModal,editingTaskId))return;
     if(editingTaskId){const task=findTaskById(list,editingTaskId);if(!task)return taskNotFound();Object.assign(task,{title,category,energy,est,priority:getTaskPriority({priority})})}
     else list.push({ id: generateId(), title, category, energy, est, act:'', checked:false, imgId:null, priority:getTaskPriority({priority}) });
-    saveData(); changeWeek(); closeModal();
+    if (!saveData()) return;
+    changeWeek(); closeModal();
 }
 
 /* =====================================================================
@@ -7473,7 +7632,8 @@ async function fetchDriveImage(fileId) {
 }
 
 async function deleteDriveImage(fileId) {
-    if (!fileId || !hasSheetConfig()) return;
+    if (!fileId) return true;
+    if (!hasSheetConfig()) return false;
     try {
         const cfg = getSheetConfig();
         const res = await fetch(cfg.url, {
@@ -7483,9 +7643,11 @@ async function deleteDriveImage(fileId) {
         });
         const data = await res.json();
         if (data.error) throw new Error(data.error);
-        deleteImage('drive_' + fileId);
+        const localDeleted = await deleteImage('drive_' + fileId);
+        return localDeleted;
     } catch (e) {
         console.warn('Drive görseli silinemedi:', e);
+        return false;
     }
 }
 
@@ -7889,10 +8051,9 @@ async function reviewSRItem(id, rating) {
         if(rating==='again'&&currentAgainCount>=3){limitSRItemForSession(id,currentAgainCount);srSessionNotice='Bu soru bugün birkaç kez tekrarlandı. Yarın yeniden gösterilecek.';await renderSRTab();return setSRUploadStatus(srSessionNotice,'ok');}
         const nextAgainCount=rating==='again'?currentAgainCount+1:0;
         const result=applySRReview(item,rating,{returnResult:true});
+        cleanupPendingSRTasks(id);
         if(!saveData()){appData.srPool[itemIndex]=before;return setSRUploadStatus('Tekrar kalıcı olarak kaydedilemedi; kayıt değiştirilmedi.','err');}
         persisted=true;
-        cleanupPendingSRTasks(id);
-        saveData();
         let queueResult=null;
         if(rating==='again')queueResult=nextAgainCount>=3?limitSRItemForSession(id,nextAgainCount):requeueSRToEnd(id,nextAgainCount);else removeFromSRSession(id);
         srSessionNotice=queueResult?.limitReached?'Bu soru bugün birkaç kez tekrarlandı. Yarın yeniden gösterilecek.':'';
@@ -7913,8 +8074,8 @@ async function scheduleSRCustomDays(id, inputId) {
     }
     applyManualSRSchedule(item,'days',days);
     cleanupPendingSRTasks(id);
+    if(!saveData())return setSRUploadStatus('Manuel tekrar kalıcı olarak kaydedilemedi; kayıt değiştirilmedi.','err');
     removeFromSRSession(id);
-    saveData();
     await renderSRTab();
     setSRManualUndoStatus(id,`✅ Manuel tekrar kaydedildi. ${days} gün sonrasına ayarlandı.`);
 }
@@ -7946,8 +8107,8 @@ async function scheduleSRCustomDate(id, inputId) {
     applyManualSRSchedule(item,'date',dateValue);
     const formatted = new Date(dateValue + 'T12:00:00').toLocaleDateString('tr-TR');
     cleanupPendingSRTasks(id);
+    if(!saveData())return setSRUploadStatus('Manuel tarih kalıcı olarak kaydedilemedi; kayıt değiştirilmedi.','err');
     removeFromSRSession(id);
-    saveData();
     await renderSRTab();
     setSRManualUndoStatus(id,`✅ Manuel tarih kaydedildi: ${formatted}.`);
 }
@@ -7968,7 +8129,7 @@ async function clearSRManualOverride(id) {
     normalizeSRItem(item);const override=item.manualOverride;if(!override)return setSRUploadStatus('Bu soru için aktif manuel plan bulunmuyor.','err');
     const previous=getSRSnapshot(item);item.interval=Math.max(0,Number(override.automaticInterval)||0);item.intervalIdx=getLegacySRIntervalIndex(item.interval);item.nextReview=override.automaticDue||getTodayStr();item.manualOverride=null;
     pushSRHistoryEvent(item,createSRHistoryEvent('manual_schedule',{action:'automatic',previous,next:getSRSnapshot(item),detail:'Otomatik plana dönüldü'}));
-    saveData();await renderSRTab();setSRUploadStatus('✅ Manuel seçim temizlendi; otomatik plana dönüldü.','ok');
+    if(!saveData())return setSRUploadStatus('Otomatik plana dönüş kalıcı olarak kaydedilemedi; kayıt değiştirilmedi.','err');await renderSRTab();setSRUploadStatus('✅ Manuel seçim temizlendi; otomatik plana dönüldü.','ok');
 }
 
 function snoozeSRItem(item,option,value) {
@@ -7986,7 +8147,7 @@ function snoozeSRItem(item,option,value) {
 async function postponeSRItem(id,option,inputId='') {
     const item=appData.srPool.find(x=>x.id===id);if(!item)return;
     const value=option==='customDate'?String(document.getElementById(inputId)?.value||''):'';
-    try{const result=snoozeSRItem(item,option,value);cleanupPendingSRTasks(id);removeFromSRSession(id);saveData();await renderSRTab();setSRUploadStatus(`↪️ ${result.label}; scheduler durumu değişmedi.`,'ok');}catch(error){setSRUploadStatus(error.message,'err');}
+    try{const result=snoozeSRItem(item,option,value);cleanupPendingSRTasks(id);if(!saveData())return setSRUploadStatus('Erteleme kalıcı olarak kaydedilemedi; kayıt değiştirilmedi.','err');removeFromSRSession(id);await renderSRTab();setSRUploadStatus(`↪️ ${result.label}; scheduler durumu değişmedi.`,'ok');}catch(error){setSRUploadStatus(error.message,'err');}
 }
 
 async function postponeSRTomorrow(id) {
@@ -7995,11 +8156,12 @@ async function postponeSRTomorrow(id) {
 
 async function moveSRToSessionEnd(id) {
     if (!srSessionQueue.some(x=>sameSRSessionItemId(x,id))) return;
-    srSessionQueue = srSessionQueue.filter(x => !sameSRSessionItemId(x,id));
-    srSessionQueue.push(id);
     const item = appData.srPool.find(x => x.id === id);
     if (item) snoozeSRItem(item,'laterToday');
-    saveData();persistSRSessionRuntime();
+    if(!saveData())return setSRUploadStatus('Erteleme kalıcı olarak kaydedilemedi; kayıt değiştirilmedi.','err');
+    srSessionQueue = srSessionQueue.filter(x => !sameSRSessionItemId(x,id));
+    srSessionQueue.push(id);
+    persistSRSessionRuntime();
     renderSRDue();
 }
 
@@ -8086,9 +8248,16 @@ async function addSRItem() {
         addSRHistory(newSRItem, 'created', newSRItem.nextReview, 'İlk tekrar 1 gün sonra');
         appData.srPool.push(newSRItem);
 
+        if (!saveData()) {
+            await Promise.all([
+                localQuestionId ? deleteImage(localQuestionId) : Promise.resolve(true),
+                localSolutionId ? deleteImage(localSolutionId) : Promise.resolve(true),
+                uploadedQuestionId ? deleteDriveImage(uploadedQuestionId) : Promise.resolve(true),
+                uploadedSolutionId ? deleteDriveImage(uploadedSolutionId) : Promise.resolve(true)
+            ]);
+            return setSRUploadStatus('Soru kalıcı olarak kaydedilemedi; kayıt geri alındı ve görseller korunmaya çalışıldı.', 'err');
+        }
         resetSRForm();
-        saveData();
-        if (hasSheetConfig()) await pushToSheet(true);
         await renderSRTab();
 
         if (driveSucceeded) {
@@ -8119,21 +8288,24 @@ async function deleteSRItem(id) {
     if (!item || !confirm('Bu yanlış soru ve Drive’daki görselleri silinsin mi?')) return;
     cleanupPendingSRTasks(id);
     appData.srPool = appData.srPool.filter(x => x.id !== id);
-    if (item.imgId) deleteImage(item.imgId);
-    if (item.solutionImgId) deleteImage(item.solutionImgId);
-    saveData();
-    await Promise.all([
+    if (!saveData()) return setSRUploadStatus('Soru silinemedi; mevcut kayıt ve görseller korundu.', 'err');
+    const cleanupResults = await Promise.all([
+        item.imgId ? deleteImage(item.imgId) : Promise.resolve(true),
+        item.solutionImgId ? deleteImage(item.solutionImgId) : Promise.resolve(true),
         item.questionImageFileId ? deleteDriveImage(item.questionImageFileId) : Promise.resolve(),
         item.solutionImageFileId ? deleteDriveImage(item.solutionImageFileId) : Promise.resolve()
     ]);
     await renderSRTab();
+    if (cleanupResults.some(result => result === false)) {
+        setSRUploadStatus('Soru kaydı silindi; ancak bazı görsel dosyaları temizlenemedi. Planner verisi güvende, görsel temizliği daha sonra tekrar gerekebilir.', 'err');
+    }
 }
 
 function bringSRToday(id) {
     const item = appData.srPool.find(x => x.id === id);
     if (!item) return;
     item.nextReview = getTodayStr();
-    saveData();
+    if (!saveData()) return;
     renderSRTab();
 }
 
@@ -8595,13 +8767,13 @@ function persistIconChange() {
     ensureCustomCatIconsStore();
     appData.catIconSyncUpdatedAt = Date.now();
     applyCustomCatIcons();
-    safeSetStorage(STORAGE_KEY, JSON.stringify(appData));
-    scheduleSheetPush();
+    if (!saveData()) return false;
     renderCategoryIconSettings();
     renderModalCategoryPicker();
     initKonuSourceSelectors();
     renderKonuTab();
     renderMonthly(); renderWeekly(); renderDays(); renderSRTab();
+    return true;
 }
 function compressIconDataUrl(dataUrl, maxSize = 96, quality = 0.86) {
     return new Promise((resolve) => {
@@ -8753,14 +8925,14 @@ function renameCourseCategory(key) {
         if (!appData.categoryRenames) appData.categoryRenames = {};
         appData.categoryRenames[key] = name;
     }
-    catNames[key] = name;
     (appData.topicTracker?.subjects || []).forEach(subject => {
         if (subject && (subject.id === 'tracker_' + key || subject.categoryKey === key)) subject.name = name;
     });
     (appData.studySessions || []).forEach(session => {
         if (session.subjectKey === key) session.subjectName = name;
     });
-    saveData();
+    if (!saveData()) return;
+    catNames[key] = name;
     refreshAllCategoryControls();
     renderCustomCourseList();
     renderKonuTab();
@@ -8826,13 +8998,13 @@ function addCustomCategory() {
         let n = 2;
         while (catNames[key]) key = keyBase + '_' + n++;
         appData.customCategories.push({ key, name, icon });
+        if (!saveData()) return;
         catNames[key] = name;
         catIcons[key] = icon;
         defaultCatIcons[key] = icon;
         if (!konuSourcePresets[key]) konuSourcePresets[key] = [{ key:'manuel-' + key, label:'Manuel / Diğer ' + name }];
         if (nameEl) nameEl.value = '';
         if (iconEl) iconEl.value = '';
-        saveData();
         renderCustomCourseList();
         refreshAllCategoryControls();
         renderKonuTab();
@@ -8853,13 +9025,13 @@ function deleteCustomCategory(key) {
     if (!confirm(msg)) return;
     appData.konuGroups = (appData.konuGroups || []).filter(g => g.cat !== key);
     appData.customCategories = (appData.customCategories || []).filter(x => x.key !== key);
-    delete catNames[key]; delete catIcons[key]; delete defaultCatIcons[key];
     if (appData.customKonuSources) delete appData.customKonuSources[key];
     if (appData.konuSourceRenames) delete appData.konuSourceRenames[key];
     if (appData.hiddenKonuSources) delete appData.hiddenKonuSources[key];
     if (appData.konuActiveSource) delete appData.konuActiveSource[key];
     if (appData.konuOpenCats) delete appData.konuOpenCats[key];
-    saveData();
+    if (!saveData()) return;
+    delete catNames[key]; delete catIcons[key]; delete defaultCatIcons[key];
     refreshAllCategoryControls();
     renderCustomCourseList();
     renderKonuTab();
@@ -8905,7 +9077,7 @@ function renameKonuSource(cat, sourceKey) {
             g.source = label;
         }
     });
-    saveData();
+    if (!saveData()) return;
     initKonuSourceSelectors();
     renderKonuTab();
 }
@@ -8944,7 +9116,7 @@ function deleteKonuSource(cat, sourceKey) {
     if (appData.konuSourceRenames && appData.konuSourceRenames[cat]) delete appData.konuSourceRenames[cat][sourceKey];
     if (appData.konuActiveSource && appData.konuActiveSource[cat] === sourceKey) delete appData.konuActiveSource[cat];
 
-    saveData();
+    if (!saveData()) return;
     initKonuSourceSelectors();
     renderKonuTab();
 }
@@ -8997,7 +9169,7 @@ function addKonuSource() {
     if (!appData.konuOpenCats) appData.konuOpenCats = {};
     appData.konuActiveSource[cat] = key;
     appData.konuOpenCats[cat] = true;
-    saveData();
+    if (!saveData()) return;
     renderKonuCatOnlyPicker('newSource');
     renderKonuTab();
     alert(`Kaynak eklendi: ${label}`);
@@ -9093,7 +9265,7 @@ function initKonuSourceSelectors() {
 function toggleKonuSourceTab(cat, sourceKey) {
     if (!appData.konuActiveSource) appData.konuActiveSource = {};
     appData.konuActiveSource[cat] = sourceKey;
-    saveData();
+    if (!saveData()) return;
     renderKonuTab();
 }
 
@@ -9156,9 +9328,9 @@ function importPlaylistTextToKonu() {
         totalDuration: totalSec ? formatDurationTotal(totalSec) : '',
         metric: totalSec ? `${items.length} video · ${formatDurationTotal(totalSec)}` : `${items.length} video`
     });
+    if (!saveData()) return;
     clearPlaylistImportBox();
     document.getElementById('playlistGroupName').value = '';
-    saveData();
     renderKonuTab();
     alert(`Eklendi: ${items.length} video${totalSec ? ' · toplam ' + formatDurationTotal(totalSec) : ''}`);
 }
@@ -9222,8 +9394,8 @@ function addKonuGroup() {
     if (!appData.konuActiveSource) appData.konuActiveSource = {};
     appData.konuActiveSource[cat] = sourcePreset.key;
 
+    if (!saveData()) return;
     nameEl.value = '';
-    saveData();
     renderKonuTab();
     setCollapsiblePanelOpen('newGroupPanel', true);
     setNewGroupStatus(`✅ “${name}” grubu ${catNames[cat] || cat} → ${sourcePreset.label} altına eklendi.`, 'ok');
@@ -9237,12 +9409,12 @@ function renameKonuGroup(id) {
     const name = next.trim();
     if (!name) return alert('Konu grubu adı boş olamaz.');
     group.name = name;
-    saveData(); renderKonuTab();
+    if (!saveData()) return; renderKonuTab();
 }
 function deleteKonuGroup(id) {
     if (!confirm('Bu grubu sil?')) return;
     appData.konuGroups = appData.konuGroups.filter(g => g.id !== id);
-    saveData(); renderKonuTab();
+    if (!saveData()) return; renderKonuTab();
 }
 function addKonuItem(groupId) {
     const input = document.getElementById('konu-input-' + groupId);
@@ -9258,9 +9430,9 @@ function addKonuItem(groupId) {
         } else {
             group.items.push(val);
         }
+        if (!saveData()) return;
         if (input) input.value = '';
         if (durationInput) durationInput.value = '';
-        saveData();
         renderKonuTab();
     }
 }
@@ -9293,7 +9465,7 @@ function deleteKonuItem(groupId, idx) {
         group.metric = `${group.items.length} parça`;
     }
 
-    saveData();
+    if (!saveData()) return;
     renderKonuTab();
 }
 function toggleKonu(groupId, idx, checked) {
@@ -9301,7 +9473,7 @@ function toggleKonu(groupId, idx, checked) {
     if (!group) return;
     if (!group.checked) group.checked = {};
     group.checked[idx] = checked;
-    saveData(); renderKonuTab();
+    if (!saveData()) return; renderKonuTab();
 }
 function getKonuLabel(item) {
     return (typeof item === 'string') ? item : (item.label || 'Adsız konu');
@@ -9342,7 +9514,7 @@ function updateKonuSummary() {
 function toggleKonuSection(cat) {
     if (!appData.konuOpenCats) appData.konuOpenCats = {};
     appData.konuOpenCats[cat] = !appData.konuOpenCats[cat];
-    saveData();
+    if (!saveData()) return;
     renderKonuTab();
 }
 
@@ -9521,20 +9693,20 @@ function setTrackerExam(x){trackerExam=x==='AYT'?'AYT':'TYT';trackerSubjectId=''
 function setTrackerTopicFilter(value){trackerTopicFilter=value||'';renderTopicTracker()}
 function setTrackerStageFilter(value){trackerStageFilter=value||'';renderTopicTracker()}
 function toggleTrackerTopic(id){if(trackerOpenTopicIds.has(id))trackerOpenTopicIds.delete(id);else trackerOpenTopicIds.add(id);renderTopicTracker()}
-function addTrackerSubject(){const i=document.getElementById('trackerNewSubjectName'),name=(i?.value||'').trim();if(!name)return alert('Ders adını yazmalısın.');const id='ts_'+generateId();appData.topicTracker.subjects.push({id,exam:trackerExam,name,topics:[]});trackerSubjectId=id;if(i)i.value='';saveData();renderTopicTracker()}
-function renameTrackerSubject(){const s=getActiveTrackerSubject();if(!s)return;const categoryKey=String(s.id||'').startsWith('tracker_')?String(s.id).slice(8):String(s.categoryKey||'');if(categoryKey&&Object.prototype.hasOwnProperty.call(catNames,categoryKey)){renameCourseCategory(categoryKey);return}const n=prompt('Ders adını değiştir:',s.name||'');if(n===null||!n.trim())return;s.name=n.trim();saveData();renderTopicTracker()}
-function deleteTrackerSubject(){const s=getActiveTrackerSubject();if(!s||!confirm(`"${s.name}" dersi ve içindeki bütün konu ilerlemeleri silinsin mi?`))return;appData.topicTracker.subjects=appData.topicTracker.subjects.filter(x=>x.id!==s.id);trackerSubjectId='';saveData();renderTopicTracker()}
-function addTrackerTopic(){const s=getActiveTrackerSubject();if(!s)return alert('Konu eklemek için önce dropdown’dan bir ders seçmelisin.');const n=prompt(`${s.name} için konu adı:`,'');if(n===null||!n.trim())return;s.topics.push({id:'tt_'+generateId(),name:n.trim(),lectures:[],sources:[]});saveData();renderTopicTracker()}
-function renameTrackerTopic(id){const s=getTrackerSubjectForTopic(id),t=s?.topics.find(x=>x.id===id);if(!t)return;const n=prompt('Konu adını değiştir:',t.name||'');if(n===null||!n.trim())return;t.name=n.trim();saveData();renderTopicTracker()}
-function deleteTrackerTopic(id){const s=getTrackerSubjectForTopic(id),t=s?.topics.find(x=>x.id===id);if(!t||!confirm(`"${t.name}" konusu ve bütün ilerlemeleri silinsin mi?`))return;s.topics=s.topics.filter(x=>x.id!==id);saveData();renderTopicTracker()}
-function updateTrackerTopicPerformance(id,value){const s=getTrackerSubjectForTopic(id),t=s?.topics.find(x=>x.id===id);if(!t)return;const allowed=['unset','great','good','mid','hard','veryhard'];t.performance=allowed.includes(value)?value:'unset';saveData();renderTopicTracker()}
+function addTrackerSubject(){const i=document.getElementById('trackerNewSubjectName'),name=(i?.value||'').trim();if(!name)return alert('Ders adını yazmalısın.');const id='ts_'+generateId();appData.topicTracker.subjects.push({id,exam:trackerExam,name,topics:[]});if(!saveData())return;trackerSubjectId=id;if(i)i.value='';renderTopicTracker()}
+function renameTrackerSubject(){const s=getActiveTrackerSubject();if(!s)return;const categoryKey=String(s.id||'').startsWith('tracker_')?String(s.id).slice(8):String(s.categoryKey||'');if(categoryKey&&Object.prototype.hasOwnProperty.call(catNames,categoryKey)){renameCourseCategory(categoryKey);return}const n=prompt('Ders adını değiştir:',s.name||'');if(n===null||!n.trim())return;s.name=n.trim();if(!saveData())return;renderTopicTracker()}
+function deleteTrackerSubject(){const s=getActiveTrackerSubject();if(!s||!confirm(`"${s.name}" dersi ve içindeki bütün konu ilerlemeleri silinsin mi?`))return;appData.topicTracker.subjects=appData.topicTracker.subjects.filter(x=>x.id!==s.id);if(!saveData())return;trackerSubjectId='';renderTopicTracker()}
+function addTrackerTopic(){const s=getActiveTrackerSubject();if(!s)return alert('Konu eklemek için önce dropdown’dan bir ders seçmelisin.');const n=prompt(`${s.name} için konu adı:`,'');if(n===null||!n.trim())return;s.topics.push({id:'tt_'+generateId(),name:n.trim(),lectures:[],sources:[]});if(!saveData())return;renderTopicTracker()}
+function renameTrackerTopic(id){const s=getTrackerSubjectForTopic(id),t=s?.topics.find(x=>x.id===id);if(!t)return;const n=prompt('Konu adını değiştir:',t.name||'');if(n===null||!n.trim())return;t.name=n.trim();if(!saveData())return;renderTopicTracker()}
+function deleteTrackerTopic(id){const s=getTrackerSubjectForTopic(id),t=s?.topics.find(x=>x.id===id);if(!t||!confirm(`"${t.name}" konusu ve bütün ilerlemeleri silinsin mi?`))return;s.topics=s.topics.filter(x=>x.id!==id);if(!saveData())return;renderTopicTracker()}
+function updateTrackerTopicPerformance(id,value){const s=getTrackerSubjectForTopic(id),t=s?.topics.find(x=>x.id===id);if(!t)return;const allowed=['unset','great','good','mid','hard','veryhard'];t.performance=allowed.includes(value)?value:'unset';if(!saveData())return;renderTopicTracker()}
 function trackerPerformanceOptions(value){const opts=[['unset','⚪ Değerlendirilmedi'],['great','🟣 Çok iyiyim'],['good','🟢 İyiyim'],['mid','🟡 Orta'],['hard','🟠 Zorlanıyorum'],['veryhard','🔴 Çok zorlanıyorum']];return opts.map(([v,l])=>`<option value="${v}" ${value===v?'selected':''}>${l}</option>`).join('')}
-function addTrackerLecture(id){const s=getTrackerSubjectForTopic(id),t=s?.topics.find(x=>x.id===id);if(!t)return;if(!Array.isArray(t.lectures))t.lectures=[];t.lectures.push({id:'lec_'+generateId(),name:'YouTube Konu Anlatımı',total:0,done:0});saveData();renderTopicTracker()}
-function updateTrackerLecture(tid,lid,f,v){const s=getTrackerSubjectForTopic(tid),t=s?.topics.find(x=>x.id===tid),r=t?.lectures?.find(x=>x.id===lid);if(!r)return;if(f==='name')r.name=String(v||'').trim()||'Konu Anlatımı';if(f==='total'){r.total=Math.max(0,Math.floor(Number(v)||0));r.done=Math.min(r.done||0,r.total)}if(f==='done')r.done=Math.max(0,Math.min(r.total||0,Math.floor(Number(v)||0)));saveData();renderTopicTracker()}
-function deleteTrackerLecture(tid,lid){const s=getTrackerSubjectForTopic(tid),t=s?.topics.find(x=>x.id===tid);if(!t)return;t.lectures=(t.lectures||[]).filter(x=>x.id!==lid);saveData();renderTopicTracker()}
-function addTrackerSource(id){const s=getTrackerSubjectForTopic(id),t=s?.topics.find(x=>x.id===id);if(!t)return;t.sources.push({id:'src_'+generateId(),name:'Yeni Test Kaynağı',total:0,done:0,correct:0,wrong:0,blank:0,difficulty:'medium'});saveData();renderTopicTracker()}
-function updateTrackerSource(tid,sid,f,v){const s=getTrackerSubjectForTopic(tid),t=s?.topics.find(x=>x.id===tid),r=t?.sources.find(x=>x.id===sid);if(!r)return;if(f==='name')r.name=String(v||'').trim()||'Adsız Kaynak';if(f==='total'){r.total=Math.max(0,Math.floor(Number(v)||0));r.done=Math.min(r.done||0,r.total)}if(f==='done')r.done=Math.max(0,Math.min(r.total||0,Math.floor(Number(v)||0)));if(['correct','wrong','blank'].includes(f))r[f]=Math.max(0,Math.floor(Number(v)||0));if(f==='difficulty')r.difficulty=['easy','medium','hard'].includes(v)?v:'medium';saveData();renderTopicTracker()}
-function deleteTrackerSource(tid,sid){const s=getTrackerSubjectForTopic(tid),t=s?.topics.find(x=>x.id===tid);if(!t)return;t.sources=t.sources.filter(x=>x.id!==sid);saveData();renderTopicTracker()}
+function addTrackerLecture(id){const s=getTrackerSubjectForTopic(id),t=s?.topics.find(x=>x.id===id);if(!t)return;if(!Array.isArray(t.lectures))t.lectures=[];t.lectures.push({id:'lec_'+generateId(),name:'YouTube Konu Anlatımı',total:0,done:0});if(!saveData())return;renderTopicTracker()}
+function updateTrackerLecture(tid,lid,f,v){const s=getTrackerSubjectForTopic(tid),t=s?.topics.find(x=>x.id===tid),r=t?.lectures?.find(x=>x.id===lid);if(!r)return;if(f==='name')r.name=String(v||'').trim()||'Konu Anlatımı';if(f==='total'){r.total=Math.max(0,Math.floor(Number(v)||0));r.done=Math.min(r.done||0,r.total)}if(f==='done')r.done=Math.max(0,Math.min(r.total||0,Math.floor(Number(v)||0)));if(!saveData())return;renderTopicTracker()}
+function deleteTrackerLecture(tid,lid){const s=getTrackerSubjectForTopic(tid),t=s?.topics.find(x=>x.id===tid);if(!t)return;t.lectures=(t.lectures||[]).filter(x=>x.id!==lid);if(!saveData())return;renderTopicTracker()}
+function addTrackerSource(id){const s=getTrackerSubjectForTopic(id),t=s?.topics.find(x=>x.id===id);if(!t)return;t.sources.push({id:'src_'+generateId(),name:'Yeni Test Kaynağı',total:0,done:0,correct:0,wrong:0,blank:0,difficulty:'medium'});if(!saveData())return;renderTopicTracker()}
+function updateTrackerSource(tid,sid,f,v){const s=getTrackerSubjectForTopic(tid),t=s?.topics.find(x=>x.id===tid),r=t?.sources.find(x=>x.id===sid);if(!r)return;if(f==='name')r.name=String(v||'').trim()||'Adsız Kaynak';if(f==='total'){r.total=Math.max(0,Math.floor(Number(v)||0));r.done=Math.min(r.done||0,r.total)}if(f==='done')r.done=Math.max(0,Math.min(r.total||0,Math.floor(Number(v)||0)));if(['correct','wrong','blank'].includes(f))r[f]=Math.max(0,Math.floor(Number(v)||0));if(f==='difficulty')r.difficulty=['easy','medium','hard'].includes(v)?v:'medium';if(!saveData())return;renderTopicTracker()}
+function deleteTrackerSource(tid,sid){const s=getTrackerSubjectForTopic(tid),t=s?.topics.find(x=>x.id===tid);if(!t)return;t.sources=t.sources.filter(x=>x.id!==sid);if(!saveData())return;renderTopicTracker()}
 function renderTopicTrackerLegacy(){
     ensureTopicTrackerData();
     document.getElementById('trackerExamTYT')?.classList.toggle('active',trackerExam==='TYT');
