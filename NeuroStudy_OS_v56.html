@@ -86,21 +86,6 @@
         .card { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; }
         .card h3 { margin-top: 0; font-size: 1.05rem; color: #fff; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
 
-        /* ===== TIMER ===== */
-        .timer-display { font-size: 3rem; font-weight: bold; text-align: center; color: #fff; margin: 10px 0; font-variant-numeric: tabular-nums; letter-spacing: 2px; }
-        .timer-controls { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-        .btn-start { background: var(--ayt_mat); color: #000; padding: 8px 16px; border-radius: 6px; font-weight: bold; border: none; cursor: pointer; }
-        .btn-pause { background: var(--prob); color: #000; padding: 8px 16px; border-radius: 6px; font-weight: bold; border: none; cursor: pointer; }
-        .btn-stop  { background: var(--kriz); color: #fff;  padding: 8px 16px; border-radius: 6px; font-weight: bold; border: none; cursor: pointer; }
-
-        /* ===== CHART ===== */
-        .chart-container { display: flex; align-items: flex-end; height: 130px; gap: 12px; margin-top: auto; padding-bottom: 25px; position: relative; overflow-x: auto; border-bottom: 1px dashed var(--border-color); }
-        .chart-bar-group { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; min-width: 45px; position: relative; }
-        .chart-bar { width: 35px; background: var(--geo); border-radius: 4px 4px 0 0; transition: height 0.5s ease-out; position: relative; min-height: 2px; }
-        .chart-bar:hover .chart-tooltip { display: block; }
-        .chart-label { font-size: 0.75rem; color: var(--text-muted); margin-top: 5px; font-weight: bold; }
-        .chart-tooltip { display: none; font-size: 0.7rem; color: #fff; background: #000; padding: 3px 6px; border-radius: 4px; position: absolute; top: -30px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-weight: bold; border: 1px solid var(--border-color); z-index: 10; }
-
         /* ===== PROGRESS ===== */
         .progress-wrapper { margin-bottom: 12px; }
         .progress-label { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 5px; font-weight: bold; }
@@ -1230,17 +1215,6 @@
         }
         .card h3 { font-size:.92rem; color:#f4f5fb; }
 
-        .timer-display {
-            font-size:2.65rem;
-            letter-spacing:-.05em;
-            font-weight:850;
-            background:linear-gradient(90deg, #fff, #b8b2ff);
-            -webkit-background-clip:text;
-            background-clip:text;
-            color:transparent;
-        }
-        .timer-controls button { border-radius:11px; box-shadow:none; }
-
         .goals-grid { gap:12px; }
         .days-grid { gap:11px; }
         .day-column {
@@ -2267,7 +2241,7 @@
         html[data-theme="light"] .modal-overlay{background:rgba(50,60,80,.32)}html[data-theme="light"] .modal{background:var(--appearance-modal)}
         html[data-theme="light"] .tracker-topic-menu-panel{background:var(--appearance-modal);border-color:var(--appearance-border);box-shadow:0 14px 30px rgba(50,60,80,.16)}
         html[data-theme="light"] .progress-bg,html[data-theme="light"] .tracker-progress-bg,html[data-theme="light"] .konu-mini-bar,html[data-theme="light"] .tracker-topic-success-bar{background:var(--appearance-progress);border-color:var(--appearance-border)}
-        html[data-theme="light"] .chart-tooltip,[data-theme="light"] [title]:hover:after{background:var(--appearance-tooltip);color:#fff}
+        [data-theme="light"] [title]:hover:after{background:var(--appearance-tooltip);color:#fff}
         html[data-theme="light"] .tab-btn.active{color:var(--appearance-accent)}html[data-theme="light"] .tab-btn:hover{color:var(--appearance-accent-2)}
         html[data-theme="light"] #tab-main .dashboard-week-nav,html[data-theme="light"] #tab-main .dashboard-date-picker{background:var(--appearance-surface);border-color:var(--appearance-border);color:var(--appearance-muted);box-shadow:0 10px 28px rgba(50,60,80,.08)}
         html[data-theme="light"] #tab-main .task-item{background:var(--appearance-surface-2);border-top-color:var(--appearance-border);border-right-color:var(--appearance-border);border-bottom-color:var(--appearance-border);color:var(--appearance-text);box-shadow:0 5px 14px rgba(50,60,80,.08)}
@@ -2326,7 +2300,6 @@
         html[data-theme-preference="blush-ivory"] .sr-mode-hint,html[data-theme-preference="blush-ivory"] .sr-mode-hint strong{color:#211A22!important}html[data-theme-preference="blush-ivory"] .sr-mode-hint{background:#F7F3FF!important;border-color:#D8C9EC!important}
         html[data-theme-preference="blush-ivory"] .sr-stat{background:var(--appearance-accent)!important;border-color:var(--appearance-accent)!important;box-shadow:0 7px 18px rgba(184,50,104,.16)!important}html[data-theme-preference="blush-ivory"] .sr-stat strong,html[data-theme-preference="blush-ivory"] .sr-stat span{color:#fff!important}
         html[data-theme-preference="blush-ivory"] .tracker-accordion-toggle{background:#EEE7FA!important;border-color:#C7B4EA!important;color:#5E3D9C!important;font-weight:900!important}
-        html[data-theme-preference="blush-ivory"] #timerDisplay{background:none!important;color:var(--appearance-accent)!important;-webkit-text-fill-color:var(--appearance-accent)!important;text-shadow:none!important}
         html[data-theme-preference="blush-ivory"] .studio-quick .studio-secondary{background:#EEE7FA!important;border-color:#C7B4EA!important;color:#5E3D9C!important;opacity:1!important}html[data-theme-preference="blush-ivory"] .studio-quick .studio-secondary:hover{background:#E3D7F5!important;border-color:#7C5CBF!important;color:#41266F!important}
         html[data-theme-preference="blush-ivory"] #srDueLabel{min-height:28px;padding:5px 11px;background:#EEE7FA!important;border-color:#C7B4EA!important;color:#41266F!important;font-size:12px!important;font-weight:700!important;line-height:1.3}
         html[data-theme-preference="blush-ivory"] #tab-main .task-item.priority-task-must{background:var(--appearance-accent)!important;border-color:var(--appearance-accent)!important;box-shadow:0 8px 20px rgba(184,50,104,.18)!important}html[data-theme-preference="blush-ivory"] #tab-main .task-item.priority-task-must .task-title,html[data-theme-preference="blush-ivory"] #tab-main .task-item.priority-task-must .task-metrics,html[data-theme-preference="blush-ivory"] #tab-main .task-item.priority-task-must .energy-warn{color:#fff!important}html[data-theme-preference="blush-ivory"] #tab-main .task-item.priority-task-must .priority-must{background:#fff!important;color:var(--appearance-accent)!important;border-color:#fff!important}html[data-theme-preference="blush-ivory"] #tab-main .task-item.priority-task-must .act-input{background:#fff!important;color:#2F2630!important}
@@ -2474,21 +2447,6 @@
             </div>
         </div>
 
-        <div class="card">
-            <h3>⏱️ Derin Odak Sayacı</h3>
-            <div class="timer-display" id="timerDisplay">50:00</div>
-            <div class="timer-controls">
-                <button type="button" class="btn-start" id="startBtn" onclick="startTimer(50)">▶️ Başla (50')</button>
-                <button type="button" class="btn-pause" id="pauseBtn" onclick="pauseTimer()" style="display:none;">⏸️ Duraklat</button>
-                <button type="button" class="btn-start" id="resumeBtn" onclick="resumeTimer()" style="display:none;">▶️ Devam Et</button>
-                <button type="button" class="btn-stop" id="stopBtn" onclick="stopTimer()" style="display:none;">⏹️ Bitir &amp; Kaydet</button>
-            </div>
-        </div>
-
-        <div class="card">
-            <h3>📈 Haftalık Odak Süresi (Dk)</h3>
-            <div class="chart-container" id="chart-container"><div class="chart-bar-group"><div class="chart-bar" style="height:0%;"><div class="chart-tooltip">0.0 dk</div></div><div class="chart-label">W26</div></div><div class="chart-bar-group"><div class="chart-bar" style="height:0%;"><div class="chart-tooltip">0.0 dk</div></div><div class="chart-label">W27</div></div><div class="chart-bar-group"><div class="chart-bar" style="height:0%;background:var(--ayt_mat);"><div class="chart-tooltip">0.0 dk</div></div><div class="chart-label">W28</div></div></div>
-        </div>
     </div>
 
     <div class="goals-grid">
@@ -6165,9 +6123,6 @@ const daysOfWeek = ["Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumarte
 const energyMap   = { 'high':'🔴', 'mid':'🟡', 'low':'🟢' };
 
 let currentWeekStr = "", targetListIdForModal = "", editingTaskId = null;
-const TIMER_STORAGE_KEY = 'neurostudy_timer_state_v1';
-let timerInterval = null, timerTotalSeconds = 50*60, timerRemaining = 50*60;
-let timerState = null;
 let pushTargetTaskId = null;
 let rescueVisible = false;
 let srSessionQueue = [];
@@ -6561,6 +6516,7 @@ async function manualSheetSync() {
    INIT
    ===================================================================== */
 async function init() {
+    try { localStorage.removeItem('neurostudy_timer_state_v1'); } catch (error) {}
     try {
         await openDB();
         document.getElementById('dbStatus').textContent = '✅ IndexedDB';
@@ -6590,7 +6546,6 @@ async function init() {
     hydratePharmacyHours();
     initKonuSourceSelectors();
     setCurrentWeek();
-    restoreTimer();
     checkEczaneTime();
     setInterval(checkEczaneTime, 60000);
 }
@@ -7072,7 +7027,7 @@ function saveData() {
         return false;
     }
     lastPersistedAppDataJson = serialized;
-    updateProgress(); renderChart();
+    updateProgress();
     scheduleSheetPush();
     return true;
 }
@@ -7090,7 +7045,7 @@ function changeWeek(requestedWeek, selectedDateStr) {
         saveData();
     }
     renderMonthly(); renderWeekly(); renderDays(); renderTodayPriority(); renderWeeklyBoard(); renderSRTab();
-    updateProgress(); renderChart(); renderDashboardWeekNavigation(selectedDateStr);
+    updateProgress(); renderDashboardWeekNavigation(selectedDateStr);
 }
 function generateId() { return Math.random().toString(36).substr(2,9); }
 function formatLocalDate(date) {
@@ -9756,183 +9711,6 @@ function updateProgress() {
     document.getElementById('fill-daily').style.width = (tD?(cD/tD)*100:0)+'%';
     document.getElementById('lbl-daily').innerText = (tD?Math.round((cD/tD)*100):0)+'%';
 }
-function renderChart() {
-    const container = document.getElementById('chart-container');
-    const weeks = [...new Set([...Object.keys(appData.weeks), currentWeekStr])].sort();
-    let max = 1;
-    weeks.forEach(w => { if ((appData.weeks[w]?.focusTime || 0) > max) max = appData.weeks[w].focusTime; });
-    container.innerHTML = weeks.map(w => {
-        const t = appData.weeks[w]?.focusTime || 0;
-        const h = (t/max)*100;
-        const active = w === currentWeekStr ? 'background:var(--ayt_mat);' : '';
-        return `<div class="chart-bar-group"><div class="chart-bar" style="height:${h}%;${active}"><div class="chart-tooltip">${t.toFixed(1)} dk</div></div><div class="chart-label">${w.split('-')[1]}</div></div>`;
-    }).join('');
-}
-
-/* =====================================================================
-   TIMER
-   ===================================================================== */
-function playAlarm() {
-    try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        [880, 1100, 880].forEach((freq, i) => {
-            const osc = ctx.createOscillator(); const gain = ctx.createGain();
-            osc.type = 'sine'; osc.frequency.value = freq;
-            gain.gain.setValueAtTime(0.3, ctx.currentTime + i*0.2);
-            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i*0.2 + 0.15);
-            osc.connect(gain); gain.connect(ctx.destination);
-            osc.start(ctx.currentTime + i*0.2); osc.stop(ctx.currentTime + i*0.2 + 0.2);
-        });
-    } catch(e) {}
-}
-function readTimerState() {
-    try {
-        const value = JSON.parse(localStorage.getItem(TIMER_STORAGE_KEY) || 'null');
-        if (!value || !['running','paused'].includes(value.status)) return null;
-        const totalValue = Number(value.totalSeconds);
-        if (!Number.isFinite(totalValue) || totalValue <= 0) return null;
-        const total = Math.max(1, Math.round(totalValue));
-        const remainingValue = Number(value.remainingSeconds);
-        const endsAtValue = Number(value.endsAt);
-        const endsAt = Number.isFinite(endsAtValue) ? Math.max(0, endsAtValue) : 0;
-        if (value.status === 'running' && !endsAt) return null;
-        const calculatedRemaining = value.status === 'running'
-            ? Math.ceil((endsAt - Date.now()) / 1000)
-            : (Number.isFinite(remainingValue) ? remainingValue : total);
-        const remaining = Math.max(0, Math.min(total, Math.round(calculatedRemaining)));
-        return { status:value.status, totalSeconds:total, remainingSeconds:remaining, endsAt, weekKey:value.weekKey || currentWeekStr };
-    } catch(e) {
-        return null;
-    }
-}
-function persistTimerState() {
-    try {
-        if (!timerState) {
-            localStorage.removeItem(TIMER_STORAGE_KEY);
-            return true;
-        }
-        const snapshot = { ...timerState };
-        if (snapshot.status === 'running') snapshot.remainingSeconds = getTimerRemainingSeconds();
-        localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(snapshot));
-        return true;
-    } catch(e) {
-        console.warn('Timer durumu kalıcı olarak kaydedilemedi:', e);
-        return false;
-    }
-}
-function getTimerRemainingSeconds() {
-    if (!timerState) return 50*60;
-    if (timerState.status === 'running') return Math.max(0, Math.ceil((timerState.endsAt - Date.now()) / 1000));
-    return Math.max(0, timerState.remainingSeconds);
-}
-function formatTimer(seconds) {
-    const safe = Math.max(0, Math.round(Number(seconds) || 0));
-    return String(Math.floor(safe/60)).padStart(2,'0') + ':' + String(safe%60).padStart(2,'0');
-}
-function renderTimerState() {
-    timerRemaining = getTimerRemainingSeconds();
-    timerTotalSeconds = timerState?.totalSeconds || 50*60;
-    document.getElementById('timerDisplay').innerText = formatTimer(timerRemaining);
-    const status = timerState?.status || 'idle';
-    document.getElementById('startBtn').style.display = status === 'idle' ? 'inline-block' : 'none';
-    document.getElementById('pauseBtn').style.display = status === 'running' ? 'inline-block' : 'none';
-    document.getElementById('resumeBtn').style.display = status === 'paused' ? 'inline-block' : 'none';
-    document.getElementById('stopBtn').style.display = status === 'idle' ? 'none' : 'inline-block';
-}
-function armTimerInterval() {
-    clearInterval(timerInterval);
-    timerInterval = null;
-    if (timerState?.status !== 'running') return;
-    timerInterval = setInterval(tick, 1000);
-}
-function startTimer(min) {
-    const total = Math.max(1, Math.round(Number(min) * 60));
-    timerState = { status:'running', totalSeconds:total, remainingSeconds:total, endsAt:Date.now() + total*1000, weekKey:currentWeekStr };
-    timerTotalSeconds = total;
-    timerRemaining = total;
-    renderTimerState();
-    armTimerInterval();
-    persistTimerState();
-}
-function pauseTimer() {
-    if (timerState?.status !== 'running') return;
-    timerState.remainingSeconds = getTimerRemainingSeconds();
-    timerState.status = 'paused';
-    timerState.endsAt = 0;
-    persistTimerState();
-    armTimerInterval();
-    renderTimerState();
-}
-function resumeTimer() {
-    if (timerState?.status !== 'paused') return;
-    timerState.status = 'running';
-    timerState.endsAt = Date.now() + timerState.remainingSeconds*1000;
-    persistTimerState();
-    renderTimerState();
-    armTimerInterval();
-}
-function settleTimer(completed, notify) {
-    if (!timerState) return;
-    const state = timerState;
-    const remaining = completed ? 0 : getTimerRemainingSeconds();
-    const elapsedMinutes = Math.max(0, (state.totalSeconds - remaining) / 60);
-    clearInterval(timerInterval);
-    timerInterval = null;
-    timerState = null;
-    persistTimerState();
-    if (elapsedMinutes > 0) {
-        ensureWeekExists(state.weekKey || currentWeekStr);
-        appData.weeks[state.weekKey || currentWeekStr].focusTime += elapsedMinutes;
-        saveData();
-        renderChart();
-    }
-    timerTotalSeconds = 50*60;
-    timerRemaining = 50*60;
-    renderTimerState();
-    if (completed && notify) {
-        playAlarm();
-        setTimeout(()=>alert('🎉 Odaklanma tamamlandı!'),50);
-    }
-}
-function stopTimer() {
-    settleTimer(false, false);
-}
-function tick() {
-    if (timerState?.status !== 'running') return;
-    timerRemaining = getTimerRemainingSeconds();
-    if (timerRemaining <= 0) {
-        settleTimer(true, true);
-        return;
-    }
-    document.getElementById('timerDisplay').innerText = formatTimer(timerRemaining);
-}
-function restoreTimer() {
-    timerState = readTimerState();
-    if (!timerState) {
-        localStorage.removeItem(TIMER_STORAGE_KEY);
-        renderTimerState();
-        return;
-    }
-    timerTotalSeconds = timerState.totalSeconds;
-    timerRemaining = getTimerRemainingSeconds();
-    if (timerState.status === 'running' && timerRemaining <= 0) {
-        settleTimer(true, false);
-        return;
-    }
-    if (timerState.status === 'running') timerState.remainingSeconds = timerRemaining;
-    persistTimerState();
-    renderTimerState();
-    armTimerInterval();
-}
-document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-        persistTimerState();
-    } else if (timerState?.status === 'running') {
-        tick();
-    }
-});
-window.addEventListener('pagehide', persistTimerState);
-
 function triggerEscapism() {
     alert("🎯 Hedef: KOSTÜ Eczacılık!\n\nKurtarma Modu'nu aç ve sadece oradaki 1 görevi bitir.\nSonra yeniden karar ver.");
 }
