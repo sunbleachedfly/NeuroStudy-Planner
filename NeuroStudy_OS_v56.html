@@ -1187,7 +1187,7 @@
         }
 
         .dashboard-grid {
-            grid-template-columns:1.05fr .85fr 1.2fr;
+            grid-template-columns:minmax(0, 1fr);
             gap:12px;
         }
         .card,
@@ -1321,8 +1321,7 @@
 
         @media (max-width: 1100px) {
             body { padding-left:108px; padding-right:18px; }
-            .dashboard-grid { grid-template-columns:1fr 1fr; }
-            .dashboard-grid .card:last-child { grid-column:1/-1; }
+            .dashboard-grid { grid-template-columns:minmax(0, 1fr); }
             .management-grid { grid-template-columns:repeat(2, minmax(0,1fr)); }
         }
         @media (max-width: 760px) {
@@ -1379,7 +1378,6 @@
             .management-grid {
                 grid-template-columns:1fr;
             }
-            .dashboard-grid .card:last-child { grid-column:auto; }
             .management-grid .icon-settings-card:not(.collapsed) { grid-column:auto; }
             .goals-grid { grid-template-columns:1fr; }
             .sheet-config-panel { margin-bottom:12px; }
@@ -2762,7 +2760,6 @@ Temel Kavramlar 01 | 1.Gün 2.Ders | 48 Günde TYT Matematik Kampı 2027,&quot;4
             <div class="study-log-summary" id="studySessionSummary"></div>
             <div class="study-log-distribution" id="studySessionSubjectDistribution"></div>
             <div class="study-log-list" id="studySessionList"></div>
-            <div class="study-log-storage" id="studySessionStorageUsage"></div>
         </section>
         <section class="study-log-panel" id="aiReportPanel">
             <div class="section-header"><div><h2>🤖 ChatGPT Raporu</h2><p class="ai-report-note">Ham çalışma kayıtlarından anlık üretilir; planner verisine kaydedilmez.</p></div></div>
@@ -2987,6 +2984,10 @@ Temel Kavramlar 01 | 1.Gün 2.Ders | 48 Günde TYT Matematik Kampı 2027,&quot;4
                     <input id="pharmacyEndTime" class="form-control" type="time" value="18:30" onchange="savePharmacyHours()">
                 </div>
                 <div class="appearance-note">Bu saatlerde yüksek enerji gerektiren görevler eczaneye uygun değil uyarısı alır.</div>
+            </section>
+            <section class="appearance-card" style="grid-column:1/-1;">
+                <h3>💾 Depolama görünürlüğü</h3>
+                <div class="study-log-storage" id="studySessionStorageUsage"></div>
             </section>
         </div>
     </div>
@@ -6516,7 +6517,6 @@ async function manualSheetSync() {
    INIT
    ===================================================================== */
 async function init() {
-    try { localStorage.removeItem('neurostudy_timer_state_v1'); } catch (error) {}
     try {
         await openDB();
         document.getElementById('dbStatus').textContent = '✅ IndexedDB';
@@ -6891,7 +6891,7 @@ function switchTab(tabId, btn) {
     if (tabId === 'tracker') renderTopicTracker();
     if (tabId === 'study-log') initStudySessionLog();
     if (tabId === 'weekly-board') renderWeeklyBoard();
-    if (tabId === 'settings') syncAppearanceControls();
+    if (tabId === 'settings') { syncAppearanceControls(); renderStudyStorageUsage(); }
 }
 function openIconPanel() {
     switchTab('konu', null);
@@ -7208,9 +7208,12 @@ function renderWeeklyBoard() {
     const grid = document.getElementById('weeklyBoardGrid');
     const range = document.getElementById('weeklyBoardRange');
     const meta = document.getElementById('weeklyBoardMeta');
-    if (!grid || !range || !meta || !currentWeekStr) return;
-    const start = getWeekStartDate(currentWeekStr);
-    if (!start) return;
+    if (!grid || !range || !meta) return;
+    if (!getWeekStartDate(currentWeekStr)) {
+        const storedWeek = (() => { try { return localStorage.getItem(DASHBOARD_WEEK_STORAGE_KEY); } catch (error) { return ''; } })();
+        currentWeekStr = getWeekStartDate(storedWeek) ? storedWeek : getWeekKeyForDate(new Date());
+    }
+    const start = getWeekStartDate(currentWeekStr) || getWeekStartDate(getWeekKeyForDate(new Date()));
     const end = new Date(start); end.setDate(start.getDate() + 6);
     const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
     const startText = start.toLocaleDateString('tr-TR',{day:'numeric',month:sameMonth?undefined:'long',year:start.getFullYear()===end.getFullYear()?undefined:'numeric'});
