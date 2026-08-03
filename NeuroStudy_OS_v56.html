@@ -2478,10 +2478,10 @@
             <h3>⏱️ Derin Odak Sayacı</h3>
             <div class="timer-display" id="timerDisplay">50:00</div>
             <div class="timer-controls">
-                <button type="button" class="btn-start" id="startBtn">▶️ Başla (50')</button>
-                <button type="button" class="btn-pause" id="pauseBtn" style="display:none;">⏸️ Duraklat</button>
-                <button type="button" class="btn-start" id="resumeBtn" style="display:none;">▶️ Devam Et</button>
-                <button type="button" class="btn-stop" id="stopBtn" style="display:none;">⏹️ Bitir &amp; Kaydet</button>
+                <button type="button" class="btn-start" id="startBtn" onclick="startTimer(50)">▶️ Başla (50')</button>
+                <button type="button" class="btn-pause" id="pauseBtn" onclick="pauseTimer()" style="display:none;">⏸️ Duraklat</button>
+                <button type="button" class="btn-start" id="resumeBtn" onclick="resumeTimer()" style="display:none;">▶️ Devam Et</button>
+                <button type="button" class="btn-stop" id="stopBtn" onclick="stopTimer()" style="display:none;">⏹️ Bitir &amp; Kaydet</button>
             </div>
         </div>
 
@@ -9845,20 +9845,6 @@ function armTimerInterval() {
     if (timerState?.status !== 'running') return;
     timerInterval = setInterval(tick, 1000);
 }
-function bindTimerControls() {
-    const controls = [
-        ['startBtn', () => startTimer(50)],
-        ['pauseBtn', pauseTimer],
-        ['resumeBtn', resumeTimer],
-        ['stopBtn', stopTimer]
-    ];
-    controls.forEach(([id, handler]) => {
-        const button = document.getElementById(id);
-        if (!button || button.dataset.timerBound === '1') return;
-        button.addEventListener('click', handler);
-        button.dataset.timerBound = '1';
-    });
-}
 function startTimer(min) {
     const total = Math.max(1, Math.round(Number(min) * 60));
     timerState = { status:'running', totalSeconds:total, remainingSeconds:total, endsAt:Date.now() + total*1000, weekKey:currentWeekStr };
@@ -9938,7 +9924,6 @@ function restoreTimer() {
     renderTimerState();
     armTimerInterval();
 }
-bindTimerControls();
 document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
         persistTimerState();
