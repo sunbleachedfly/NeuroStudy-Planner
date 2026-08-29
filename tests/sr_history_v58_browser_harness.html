@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>NeuroStudy v58 IndexedDB browser harness</title>
+<button id="seed">Seed v57 migration fixture</button>
+<button id="probe">Write/read/query probe</button>
+<pre id="result">not run</pre>
+<script>
+'use strict';
+const DB='neurostudy_sr_history_v1',EVENTS='events',META='meta',STORAGE='kostu_planner_v12';
+const result=document.getElementById('result');
+function openDb(){return new Promise((resolve,reject)=>{const request=indexedDB.open(DB,1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
+function requestValue(request){return new Promise((resolve,reject)=>{request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
+async function inspect(){
+  const db=await openDb(),tx=db.transaction([EVENTS,META],'readonly'),events=tx.objectStore(EVENTS),meta=tx.objectStore(META);
+  const fixtureRows=await requestValue(events.index('byItemTime').getAll(IDBKeyRange.bound(['browser_migration_fixture',0],['browser_migration_fixture',Number.MAX_SAFE_INTEGER])));
+  const probe=await requestValue(events.get('browser_probe_item::browser_probe_event'));
+  const migration=await requestValue(meta.get('migration:v57-history:v1'));
+  const hot=JSON.parse(localStorage.getItem(STORAGE)||'{"srPool":[]}'),fixture=hot.srPool?.find(item=>item.id==='browser_migration_fixture');
+  const output={opened:true,version:db.version,stores:[...db.objectStoreNames],eventKeyPath:events.keyPath,indexes:[...events.indexNames].sort(),metaKeyPath:meta.keyPath,fixtureCommitted:fixtureRows.filter(row=>row.status==='committed').length,fixtureIds:fixtureRows.map(row=>row.eventId).sort(),embeddedFixtureHistory:fixture?.reviewHistory?.length??null,probeRead:probe?.eventId||null,migrationPhase:migration?.phase||null,consoleErrors:window.__errors||[]};
+  db.close();result.textContent=JSON.stringify(output,null,2);return output;
+}
+window.__errors=[];window.addEventListener('error',event=>window.__errors.push(String(event.error||event.message)));
+document.getElementById('seed').onclick=()=>{
+  const current=JSON.parse(localStorage.getItem(STORAGE)||'{"monthly":[],"weeks":{},"srPool":[],"konuGroups":[],"studySessions":[]}');
+  current.srPool=Array.isArray(current.srPool)?current.srPool:[];
+  current.srPool=current.srPool.filter(item=>item.id!=='browser_migration_fixture');
+  const event=n=>({id:`browser_migration_event_${n}`,type:'review',at:`2026-08-2${n}T12:00:00.000Z`,rating:'good',action:'good',previous:{state:'learning',interval:n},next:{state:'review',interval:n+1,due:`2026-09-0${n}`},nextReview:`2026-09-0${n}`,detail:`fixture ${n}`});
+  current.srPool.push({id:'browser_migration_fixture',title:'Browser migration fixture',state:'review',interval:3,intervalIdx:2,ease:2.5,reps:3,reviewCount:3,lapses:0,lapseCount:0,isLeech:false,nextReview:'2026-09-03',lastReviewedAt:'2026-08-23T12:00:00.000Z',lastRating:'good',manualOverride:null,reviewHistory:[event(3),event(2),event(1)]});
+  localStorage.setItem(STORAGE,JSON.stringify(current));result.textContent='SEEDED';
+};
+document.getElementById('probe').onclick=async()=>{
+  const db=await openDb(),record={pk:'browser_probe_item::browser_probe_event',schemaVersion:1,eventId:'browser_probe_event',srItemId:'browser_probe_item',mutationId:'',at:'2026-08-29T12:00:00.000Z',atEpoch:1788004800000,type:'browser_probe',rating:'good',action:'good',previous:null,next:null,nextReview:'2026-08-30',manualOverride:null,detail:'actual browser IndexedDB probe',status:'committed',source:'browser-harness',payloadHash:'browser-probe'};
+  await new Promise((resolve,reject)=>{const tx=db.transaction(EVENTS,'readwrite');tx.objectStore(EVENTS).put(record);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});db.close();await inspect();
+};
+inspect().catch(error=>{window.__errors.push(String(error));result.textContent=JSON.stringify({opened:false,error:String(error),consoleErrors:window.__errors},null,2)});
+</script>
+</html>

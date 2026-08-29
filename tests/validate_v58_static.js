@@ -1,0 +1,11 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+const file=path.resolve(__dirname,'../NeuroStudy_OS_v58.html'),html=fs.readFileSync(file,'utf8');
+const scripts=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(match=>match[1]);
+let failed=0;
+scripts.forEach((source,index)=>{try{new vm.Script(source,{filename:`script-${index+1}.js`});console.log(`PASS script block ${index+1}`)}catch(error){failed++;console.error(`FAIL script block ${index+1}: ${error.message}`)}});
+const staticHtml=html.replace(/<script\b[\s\S]*?<\/script>/gi,'').replace(/<style\b[\s\S]*?<\/style>/gi,'');
+const ids=[...staticHtml.matchAll(/\sid\s*=\s*["']([^"']+)["']/gi)].map(match=>match[1]),counts=new Map();
+ids.forEach(id=>counts.set(id,(counts.get(id)||0)+1));const duplicates=[...counts].filter(([,count])=>count>1);
+console.log(`JS_SYNTAX blocks=${scripts.length} failures=${failed}`);console.log(`STATIC_IDS total=${ids.length} duplicates=${duplicates.length}`);
+if(duplicates.length){console.error(duplicates);failed++;}process.exitCode=failed?1:0;
